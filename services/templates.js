@@ -71,7 +71,7 @@ exports.userTemplate = (data) => `
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>We’ve received your wholesale application! [Do not reply]</title>
+    <title>Thank you for your application! [DO NOT REPLY]</title>
   </head>
   <body style="font-family:Poppins, Arial, sans-serif; background:#f6f6f6; margin:0; padding:48px;">
     <div style="max-width:602px; margin:0 auto; background:#fff; border-radius:16px; overflow:hidden; box-shadow:0 3px 10px rgba(0,0,0,0.08);">
@@ -83,7 +83,7 @@ exports.userTemplate = (data) => `
 
       <!-- Main content (tight, professional layout) -->
       <div style="padding:40px 48px 0; color:#222;">
-        <h1 style="font-size:24px; margin:0; text-align:center;">We’ve received your wholesale application!</h1>
+        <h1 style="font-size:24px; margin:0; text-align:center;">Thank you for your application!</h1>
         <p style="text-align:center; color:#777; margin-top:8px; margin-bottom:28px;">
           Thanks for your application — we’ll review it shortly.
         </p>
@@ -120,7 +120,9 @@ exports.userTemplate = (data) => `
       <div style="padding:14px 24px 24px; text-align:center; color:#9a9a9a; font-size:12px;">
         © ${new Date().getFullYear()} <strong>SUGARLEAN PTY LTD</strong>
         &nbsp; | &nbsp;
-        <a href="${SITE_URL}" style="color:#6f6f6f;text-decoration:none;">${SITE_URL.replace(/^https?:\/\//,"www.")}</a>
+        <a href="${SITE_URL}" style="color:#6f6f6f;text-decoration:none;">
+          ${SITE_URL.replace(/^https?:\/\/(www\.)?/, "")}
+        </a>
       </div>
     </div>
   </body>
