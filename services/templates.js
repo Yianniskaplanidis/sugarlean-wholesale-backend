@@ -59,7 +59,7 @@ exports.userTemplate = (data) => `
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Wholesale Application Received – Sugarlean</title>
+    <title>Wholesale Application Received</title>
   </head>
   <body style="font-family: Poppins, Arial, sans-serif; background:#f6f6f6; margin:0; padding:40px;">
     <div style="max-width:640px; margin:auto; background:#fff; border-radius:16px; overflow:hidden; box-shadow:0 3px 10px rgba(0,0,0,0.08);">
