@@ -11,7 +11,6 @@ const BRAND_URL   = (process.env.BRAND_URL   || "https://www.sugarlean.com.au").
 const ACCENT      = (process.env.ACCENT_COLOR || "#FEC645").trim();
 const LOGO_URL    = (process.env.LOGO_URL     ||
   "https://cdn.shopify.com/s/files/1/0508/5528/0818/files/SUGARLEAN_PTY_LTD_White.png?v=1751947986").trim();
-const POLICY_URL  = (process.env.POLICY_URL   || "https://www.sugarlean.com.au/policies/privacy-policy").trim();
 const SUPPORT_EMAIL = (process.env.SUPPORT_EMAIL || "").trim(); // optional
 const SUPPORT_PHONE = (process.env.SUPPORT_PHONE || "").trim(); // optional
 
@@ -86,15 +85,6 @@ function detailsTable(d) {
     ${d.note ? tableRow("Note", d.note) : ""} 
     ${tableRow("Accepts Marketing", yesNo(!!d.marketingOptIn))}
     ${tableRow("Terms Accepted", yesNo(!!d.policyAccepted))}
-    ${
-      POLICY_URL
-        ? tableRow(
-            "Policy",
-            `<a href="${esc(POLICY_URL)}" style="color:${ACCENT};text-decoration:none;">View policy</a>`,
-            { raw: true }
-          )
-        : ""
-    }
   </table>`;
 }
 
