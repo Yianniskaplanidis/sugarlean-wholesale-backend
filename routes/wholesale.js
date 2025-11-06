@@ -14,21 +14,14 @@ const toBool = (v) => {
   return s === "true" || s === "1" || s === "on" || s === "yes";
 };
 
-router.post("/apply", async (req, res) => {
-  console.log("🪵 Incoming /apply:", req.body); // add this
-
-  const body = req.body || {};
-  // ...rest of your code unchanged
-});
-
 // GET /api/wholesale/ping
 router.get("/ping", (_req, res) => res.json({ ok: true, route: "wholesale" }));
 
 // POST /api/wholesale/apply
 router.post("/apply", async (req, res) => {
-  // Support both your new names and the older ones we used earlier
-  const body = req.body || {};
+  console.log("🪵 Incoming /apply:", req.body);
 
+  const body = req.body || {};
   const data = {
     companyName: body.companyName || body.businessName || "",
     contactName: body.contactName || body.name || "",
@@ -47,6 +40,8 @@ router.post("/apply", async (req, res) => {
     ua: req.headers["user-agent"] || "",
   };
 
+  console.log("🔍 Validating data:", data);
+
   // ---- validation (requireds + sanity checks) ----
   const missing = [];
   if (!data.companyName) missing.push("companyName");
@@ -60,27 +55,29 @@ router.post("/apply", async (req, res) => {
   if (!data.postCode) missing.push("postCode");
   if (!data.country) missing.push("country");
 
-
-  console.log("🔍 Validating data:", data);
-
-  
   if (missing.length) {
-    return res.status(400).json({ ok: false, error: "Missing fields", missing });
+    console.warn("⛔ Missing fields:", missing);
+    return res.status(422).json({ ok: false, error: "Missing fields", missing, data });
   }
+
   if (!EMAIL_RE.test(data.email)) {
-    return res.status(400).json({ ok: false, error: "Invalid email format" });
+    console.warn("⛔ Invalid email format:", data.email);
+    return res.status(422).json({ ok: false, error: "Invalid email format", data });
   }
-  // hard requirement: policy must be accepted
+
   if (!data.policyAccepted) {
-    return res.status(400).json({ ok: false, error: "You must accept the policy to submit." });
+    console.warn("⛔ Policy not accepted");
+    return res.status(422).json({ ok: false, error: "You must accept the policy to submit.", data });
   }
 
   try {
-    await sendSignupEmail(data);
+    const info = await sendSignupEmail(data);
+    console.log("✅ sendSignupEmail result:", info);
     return res.json({ ok: true, message: "Application received. Email sent." });
   } catch (e) {
-    console.error("Email send failed:", e);
-    return res.status(502).json({ ok: false, error: "Email send failed" });
+    console.error("💥 Email send failed:", e);
+    // surface a little more info for debugging (safe subset)
+    return res.status(502).json({ ok: false, error: "Email send failed", reason: e?.message || String(e) });
   }
 });
 

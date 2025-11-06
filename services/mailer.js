@@ -10,7 +10,7 @@ const ACCENT     = process.env.ACCENT_COLOR || "#FEC645";
 const LOGO_URL   =
   process.env.LOGO_URL ||
   "https://cdn.shopify.com/s/files/1/0508/5528/0818/files/SUGARLEAN_PTY_LTD_White.png?v=1751947986";
-const POLICY_URL = (process.env.POLICY_URL || "").trim();
+const POLICY_URL = (process.env.POLICY_URL || "https://www.sugarlean.com.au/policies/privacy-policy").trim();
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || ""; // optional for footer
 const SUPPORT_PHONE = process.env.SUPPORT_PHONE || ""; // optional for footer
 
@@ -42,14 +42,16 @@ const esc = (s = "") =>
 const yesNo = (b) => (b ? "Yes" : "No");
 const stripHtml = (html) => String(html).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 
-function tableRow(label, value) {
+// table row (supports raw HTML in value cell via { raw:true })
+function tableRow(label, value, { raw = false } = {}) {
+  const v = value === undefined || value === null || value === "" ? "—" : value;
   return `
   <tr>
     <td style="background:#f3f3f3;border:1px solid #e8e8e8;padding:10px 12px;font-weight:700;color:#333;width:190px;">
       ${esc(label)}
     </td>
     <td style="border:1px solid #e8e8e8;padding:10px 12px;color:#333;">
-      ${value === undefined || value === null || value === "" ? "-" : esc(String(value))}
+      ${raw ? String(v) : esc(String(v))}
     </td>
   </tr>`;
 }
@@ -67,21 +69,23 @@ function detailsTable(d) {
     ${tableRow("State", d.state)}
     ${tableRow("Postcode", d.postCode)}
     ${tableRow("Country", d.country)}
-    ${tableRow("Message", d.note)}
+    ${d.note ? tableRow("Note", d.note) : ""} 
     ${tableRow("Accepts Marketing", yesNo(!!d.marketingOptIn))}
     ${tableRow("Terms Accepted", yesNo(!!d.policyAccepted))}
-    ${POLICY_URL ? tableRow("Policy", `<a href="${esc(POLICY_URL)}" style="color:${ACCENT};text-decoration:none;">View policy</a>`) : ""}
+    ${
+      POLICY_URL
+        ? tableRow(
+            "Policy",
+            `<a href="${esc(POLICY_URL)}" style="color:${ACCENT};text-decoration:none;">View policy</a>`,
+            { raw: true }
+          )
+        : ""
+    }
   </table>`;
 }
 
-function button({ href, label }) {
-  return `<a href="${href}" style="background:${ACCENT};color:#111;font-weight:700;text-decoration:none;padding:11px 16px;border-radius:8px;display:inline-block;">
-    ${esc(label)}
-  </a>`;
-}
-
 function cardShell({ title, subtitle, bodyHtml, footerHtml }) {
-  // Black banner header, rounded card, subtle shadow (as per your reference)
+  // Black banner header, rounded card, subtle shadow
   return `
   <div style="margin:0;padding:24px;background:#efefef;">
     <div style="max-width:760px;margin:0 auto;background:#fff;border-radius:18px;box-shadow:0 8px 22px rgba(0,0,0,.10);overflow:hidden;">
@@ -107,10 +111,12 @@ function cardShell({ title, subtitle, bodyHtml, footerHtml }) {
 
       <!-- Footer -->
       <div style="padding:16px 26px 26px 26px;text-align:center;">
-        ${footerHtml || `
-          <p style="margin:10px 0 0 0;color:#9b9b9b;font-size:12px;font-family:Arial,Helvetica,sans-serif;">
-            Sent automatically from <a href="${BRAND_URL}" style="color:${ACCENT};text-decoration:none;">${BRAND_URL.replace(/^https?:\/\//,'')}</a>
-          </p>`}
+        ${
+          footerHtml ||
+          `<p style="margin:10px 0 0 0;color:#9b9b9b;font-size:12px;font-family:Arial,Helvetica,sans-serif;">
+            Sent automatically from <a href="${BRAND_URL}" style="color:${ACCENT};text-decoration:none;">${BRAND_URL.replace(/^https?:\\/\\//,"")}</a>
+          </p>`
+        }
       </div>
     </div>
   </div>`;
@@ -126,17 +132,11 @@ async function sendSignupEmail(d) {
   const adminTo = defaultTo || user;
   const from    = defaultFrom || user;
 
-  // 1) Admin notification (full table)
+  // 1) Admin notification — table only (NO BUTTONS)
   const adminHtml = cardShell({
     title: "New Wholesale Application",
     subtitle: `A new wholesale signup has been submitted through the ${BRAND} website.`,
-    bodyHtml: `
-      ${detailsTable(d)}
-      <div style="margin-top:16px;text-align:left;">
-        ${d.email ? button({ href: `mailto:${encodeURIComponent(d.email)}`, label: "Reply to Applicant" }) : ""}
-        &nbsp;&nbsp;${button({ href: BRAND_URL, label: "Open Store" })}
-      </div>
-    `,
+    bodyHtml: detailsTable(d),
   });
 
   const subjectAdmin = `New Wholesale Application — ${d.companyName || d.contactName || BRAND}`;
@@ -160,10 +160,9 @@ async function sendSignupEmail(d) {
         <p style="margin:0 0 12px 0;">${hi}</p>
         <p style="margin:0 0 12px 0;">Thanks for applying for a wholesale account with <b>${esc(BRAND)}</b>. We’ve received your details for <b>${esc(d.companyName || "")}</b>.</p>
         <p style="margin:0 0 12px 0;">Our team will review your application and get back to you shortly. If we need anything else, we’ll reach out to the contact information you provided.</p>
-        <div style="margin:14px 0 18px;">${button({ href: BRAND_URL, label: "Visit Store" })}</div>
         ${
           SUPPORT_EMAIL || SUPPORT_PHONE
-            ? `<p style="margin:0 0 6px 0;font-size:13px;color:#666;">Questions? Reply to this email or contact us:</p>
+            ? `<p style="margin:10px 0 0 0;font-size:13px;color:#666;">Questions? Reply to this email or contact us:</p>
                <p style="margin:0;font-size:13px;color:#666;">
                  ${SUPPORT_EMAIL ? `<b>Email:</b> <a style="color:${ACCENT};text-decoration:none;" href="mailto:${esc(SUPPORT_EMAIL)}">${esc(SUPPORT_EMAIL)}</a><br>` : ""}
                  ${SUPPORT_PHONE ? `<b>Phone:</b> ${esc(SUPPORT_PHONE)}` : ""}
