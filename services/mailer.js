@@ -1,20 +1,21 @@
 // services/mailer.js
-// Sugarlean Mailer — branded admin + applicant emails
+// Sugarlean Mailer — branded admin + applicant emails (no-reply user)
 
 const nodemailer = require("nodemailer");
 
 /* ──────────────────────────────────────────────────────────────
- * Brand config (override via env)
+ * Brand config (can be overridden via env)
  * ──────────────────────────────────────────────────────────── */
-const BRAND       = process.env.BRAND_NAME   || "Sugarlean";
-const BRAND_URL   = (process.env.BRAND_URL   || "https://www.sugarlean.com.au").trim();
-const ACCENT      = (process.env.ACCENT_COLOR || "#FEC645").trim();
-const LOGO_URL    = (process.env.LOGO_URL     ||
+const BRAND         = (process.env.BRAND_NAME   || "Sugarlean").trim();
+const BRAND_URL     = (process.env.BRAND_URL    || "https://www.sugarlean.com.au").trim();
+const ACCENT        = (process.env.ACCENT_COLOR || "#FEC645").trim();
+const LOGO_URL      = (process.env.LOGO_URL     ||
   "https://cdn.shopify.com/s/files/1/0508/5528/0818/files/SUGARLEAN_PTY_LTD_White.png?v=1751947986").trim();
+const PRIVACY_URL   = (process.env.PRIVACY_URL  || "https://www.sugarlean.com.au/policies/privacy-policy").trim();
 const SUPPORT_EMAIL = (process.env.SUPPORT_EMAIL || "").trim(); // optional
 const SUPPORT_PHONE = (process.env.SUPPORT_PHONE || "").trim(); // optional
 
-// displayHost: used in footer ("sugarlean.com.au" instead of full URL)
+// for footer: "sugarlean.com.au"
 const displayHost = (() => {
   try { return new URL(BRAND_URL).host; }
   catch { return BRAND_URL.replace(/^https?:\/\/(www\.)?/, ""); }
@@ -23,22 +24,30 @@ const displayHost = (() => {
 /* ──────────────────────────────────────────────────────────────
  * SMTP
  * ──────────────────────────────────────────────────────────── */
-const host        = (process.env.EMAIL_HOST || "").trim();
-const port        = Number(process.env.EMAIL_PORT || 587);
-const secure      = (process.env.EMAIL_SECURE || "false").toString() === "true"; // 465 => true
-const user        = (process.env.EMAIL_USER || "").trim();
-const pass        = (process.env.EMAIL_PASS || "").trim();
-const defaultFrom = (process.env.EMAIL_FROM || user || "").trim();
-const defaultTo   = (process.env.EMAIL_TO   || user || "").trim();
+const host   = (process.env.EMAIL_HOST || "").trim();
+const port   = Number(process.env.EMAIL_PORT || 587);
+const secure = (process.env.EMAIL_SECURE || "false").toString() === "true"; // 465 => true
+const user   = (process.env.EMAIL_USER || "").trim();
+const pass   = (process.env.EMAIL_PASS || "").trim();
 
 const transporter = nodemailer.createTransport({
   host,
   port,
-  secure,                     // true for 465, false for 587
+  secure,                      // true for 465, false for 587
   auth: user && pass ? { user, pass } : undefined,
-  requireTLS: port === 587,   // STARTTLS on 587
+  requireTLS: port === 587,    // STARTTLS on 587
   tls: { minVersion: "TLSv1.2", servername: host },
 });
+
+/* ──────────────────────────────────────────────────────────────
+ * Mail identities + subjects
+ * ──────────────────────────────────────────────────────────── */
+const FROM_NO_REPLY = `"Sugarlean Pty Ltd (Do not reply)" <${process.env.NO_REPLY_FROM || user || "no-reply@sugarlean.com.au"}>`;
+const FROM_ADMIN    = `"Sugarlean Orders" <${process.env.ADMIN_FROM || user || "orders@sugarlean.com.au"}>`;
+const ADMIN_TO      = (process.env.ADMIN_TO || user || "").trim();
+
+const SUBJECT_USER  = "Thank you for your application! [DO NOT REPLY]";
+const SUBJECT_ADMIN = "New wholesale application received";
 
 /* ──────────────────────────────────────────────────────────────
  * utils
@@ -55,12 +64,11 @@ const yesNo = (b) => (b ? "Yes" : "No");
 const stripHtml = (html) =>
   String(html).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 
-// table row (supports raw HTML in value cell via { raw:true })
 function tableRow(label, value, { raw = false } = {}) {
   const v = value === undefined || value === null || value === "" ? "—" : value;
   return `
   <tr>
-    <td style="background:#f3f3f3;border:1px solid #e8e8e8;padding:10px 12px;font-weight:700;color:#333;width:190px;">
+    <td style="background:#f3f3f3;border:1px solid #e8e8e8;padding:10px 12px;font-weight:700;color:#333;width:42%;">
       ${esc(label)}
     </td>
     <td style="border:1px solid #e8e8e8;padding:10px 12px;color:#333;">
@@ -71,128 +79,137 @@ function tableRow(label, value, { raw = false } = {}) {
 
 function detailsTable(d) {
   return `
-  <table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;max-width:720px;">
+  <table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;">
     ${tableRow("Business Name", d.companyName)}
     ${tableRow("Contact Name", d.contactName)}
     ${tableRow("Contact Number", d.phone)}
     ${tableRow("Contact Email", d.email)}
-    ${tableRow("Abn", d.abn)}
+    ${tableRow("ABN", d.abn)}
     ${tableRow("Street Address", d.streetAddress)}
     ${tableRow("City", d.city)}
     ${tableRow("State", d.state)}
     ${tableRow("Postcode", d.postCode)}
     ${tableRow("Country", d.country)}
-    ${d.note ? tableRow("Note", d.note) : ""} 
+    ${d.note ? tableRow("Note", d.note) : ""}
     ${tableRow("Accepts Marketing", yesNo(!!d.marketingOptIn))}
     ${tableRow("Terms Accepted", yesNo(!!d.policyAccepted))}
   </table>`;
 }
 
 /* ──────────────────────────────────────────────────────────────
- * card shell
+ * Card shell (A4-ish width, professional layout)
  * ──────────────────────────────────────────────────────────── */
-function cardShell({ title, subtitle, bodyHtml, footerHtml }) {
-  // Black banner header, rounded card, subtle shadow
+function legalFooter() {
+  const year = new Date().getFullYear();
   return `
-  <div style="margin:0;padding:24px;background:#efefef;">
-    <div style="max-width:760px;margin:0 auto;background:#fff;border-radius:18px;box-shadow:0 8px 22px rgba(0,0,0,.10);overflow:hidden;">
+    <hr style="border:none;border-top:1px solid #eee;margin:18px 0;">
+    <p style="margin:8px 0 0 0;color:#9a9a9a;font-size:12px;line-height:1.5;">
+      © ${year} <strong>SUGARLEAN PTY LTD</strong>
+      &nbsp; | &nbsp;
+      <a href="${PRIVACY_URL}" style="color:#666;text-decoration:none;">Privacy Policy</a>
+      &nbsp; | &nbsp;
+      <a href="${BRAND_URL}" style="color:#666;text-decoration:none;">Website</a>
+    </p>`;
+}
+
+function cardShell({ title, subtitle, bodyHtml, footerHtml }) {
+  return `
+  <div style="margin:0;padding:48px;background:#f5f5f5;">
+    <div style="max-width:602px;margin:0 auto;background:#ffffff;border-radius:16px;box-shadow:0 6px 18px rgba(0,0,0,.08);overflow:hidden;">
       <!-- Header -->
-      <div style="background:#0f0f0f;padding:18px 22px;">
+      <div style="background:#000;padding:28px 32px;text-align:center;">
         <a href="${BRAND_URL}" target="_blank" style="text-decoration:none;">
-          <img src="${LOGO_URL}" alt="${esc(BRAND)}" style="height:42px;display:block;margin:0 auto;"/>
+          <img src="${LOGO_URL}" alt="${esc(BRAND)}" style="width:200px;height:auto;display:block;margin:0 auto;"/>
         </a>
       </div>
 
       <!-- Title -->
-      <div style="padding:26px 26px 6px 26px;text-align:center;">
-        <h1 style="margin:0 0 12px 0;font-family:Arial,Helvetica,sans-serif;font-size:28px;line-height:1.2;color:#111;">
-          ${esc(title)}
-        </h1>
-        ${subtitle ? `<p style="margin:0;font-family:Arial,Helvetica,sans-serif;color:#6b6b6b;">${esc(subtitle)}</p>` : ""}
+      <div style="padding:32px 40px 6px 40px;text-align:center;font-family:Arial,Helvetica,sans-serif;">
+        <h1 style="margin:0 0 8px 0;font-size:24px;line-height:1.25;color:#111;">${esc(title)}</h1>
+        ${subtitle ? `<p style="margin:0;color:#777;">${esc(subtitle)}</p>` : ""}
       </div>
 
       <!-- Body -->
-      <div style="padding:22px 26px 8px 26px;font-family:Arial,Helvetica,sans-serif;color:#111;">
+      <div style="padding:18px 40px 24px 40px;font-family:Arial,Helvetica,sans-serif;color:#111;line-height:1.6;">
         ${bodyHtml}
       </div>
 
       <!-- Footer -->
-      <div style="padding:16px 26px 26px 26px;text-align:center;">
+      <div style="padding:0 40px 28px 40px;text-align:center;font-family:Arial,Helvetica,sans-serif;">
         ${
           footerHtml ||
-          `<p style="margin:10px 0 0 0;color:#9b9b9b;font-size:12px;font-family:Arial,Helvetica,sans-serif;">
-            Sent automatically from
-            <a href="${BRAND_URL}" style="color:${ACCENT};text-decoration:none;">${displayHost}</a>
-          </p>`
+          `<p style="margin:0;color:#8d8d8d;font-size:13px;">
+             Sent automatically from
+             <a href="${BRAND_URL}" style="color:${ACCENT};text-decoration:none;">${displayHost}</a>
+           </p>`
         }
+        ${legalFooter()}
       </div>
     </div>
   </div>`;
 }
 
 /* ──────────────────────────────────────────────────────────────
- * helpers
+ * Public: verify + send
  * ──────────────────────────────────────────────────────────── */
 async function verifySmtp() {
   return transporter.verify();
 }
 
-/* ──────────────────────────────────────────────────────────────
- * main: admin + applicant
- * ──────────────────────────────────────────────────────────── */
 async function sendSignupEmail(d) {
-  const adminTo = defaultTo || user;
-  const from    = defaultFrom || user;
-
-  // 1) Admin notification — table only (NO BUTTONS)
+  // 1) Admin notification
   const adminHtml = cardShell({
     title: "New Wholesale Application",
     subtitle: `A new wholesale signup has been submitted through the ${BRAND} website.`,
     bodyHtml: detailsTable(d),
   });
 
-  const subjectAdmin = `New Wholesale Application — ${d.companyName || d.contactName || BRAND}`;
   const infoAdmin = await transporter.sendMail({
-    from,
-    to: adminTo,
+    from: FROM_ADMIN,
+    to: ADMIN_TO || user,
     replyTo: d.email || undefined,
-    subject: subjectAdmin,
+    subject: SUBJECT_ADMIN,
     html: adminHtml,
     text: stripHtml(adminHtml),
   });
-  console.log("✅ Admin email sent:", infoAdmin.messageId);
+  console.log(`✅ Admin email sent to ${ADMIN_TO || user}:`, infoAdmin.messageId);
 
-  // 2) Applicant confirmation (professional tone, to applicant email)
+  // 2) Applicant confirmation (do-not-reply)
   if (d.email) {
     const hi = d.contactName ? `Hi ${esc(d.contactName)},` : "Hi there,";
     const confirmHtml = cardShell({
-      title: "Thanks for your application",
-      subtitle: "We’ve received your wholesale application.",
+      title: "We’ve received your wholesale application!",
+      subtitle: "Thanks for your application — we’ll review it shortly.",
       bodyHtml: `
-        <p style="margin:0 0 12px 0;">${hi}</p>
-        <p style="margin:0 0 12px 0;">Thanks for applying for a wholesale account with <b>${esc(BRAND)}</b>. We’ve received your details for <b>${esc(d.companyName || "")}</b>.</p>
-        <p style="margin:0 0 12px 0;">Our team will review your application and get back to you shortly. If we need anything else, we’ll reach out to the contact information you provided.</p>
-        ${
-          SUPPORT_EMAIL || SUPPORT_PHONE
-            ? `<p style="margin:10px 0 0 0;font-size:13px;color:#666;">Questions? Reply to this email or contact us:</p>
-               <p style="margin:0;font-size:13px;color:#666;">
-                 ${SUPPORT_EMAIL ? `<b>Email:</b> <a style="color:${ACCENT};text-decoration:none;" href="mailto:${esc(SUPPORT_EMAIL)}">${esc(SUPPORT_EMAIL)}</a><br>` : ""}
-                 ${SUPPORT_PHONE ? `<b>Phone:</b> ${esc(SUPPORT_PHONE)}` : ""}
-               </p>`
-            : ""
-        }
+        <p style="margin:0 0 14px 0;">${hi}</p>
+        <p style="margin:0 0 14px 0;">
+          Thank you for applying for a <strong>wholesale account with ${esc(BRAND)}</strong>.
+          We’ve received your details for <strong>${esc(d.companyName || "")}</strong>.
+        </p>
+        <p style="margin:0 0 14px 0;">
+          Our team will review your submission and get back to you within a few business days.
+          If we need anything else, we’ll reach out using the contact information you provided.
+        </p>
+        <div style="text-align:center;margin:22px 0 0 0;">
+          <a href="${BRAND_URL}"
+             style="background:${ACCENT};color:#000;font-weight:600;text-decoration:none;padding:12px 24px;border-radius:8px;display:inline-block;">
+            Visit ${esc(BRAND)}
+          </a>
+        </div>
+        <p style="margin:16px 0 0 0;font-size:12px;color:#777;text-align:center;">
+          This inbox is unattended — please do not reply to this email.
+        </p>
       `,
     });
 
-    const subjectUser = `${BRAND} — We’ve received your wholesale application`;
     const infoUser = await transporter.sendMail({
-      from,
-      to: d.email, // send to applicant
-      subject: subjectUser,
+      from: FROM_NO_REPLY,
+      to: d.email,
+      subject: SUBJECT_USER,
       html: confirmHtml,
       text: stripHtml(confirmHtml),
     });
-    console.log("📩 Applicant confirmation sent:", infoUser.messageId);
+    console.log(`📩 Applicant confirmation sent to ${d.email}:`, infoUser.messageId);
   }
 
   return { ok: true };
