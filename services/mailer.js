@@ -3,18 +3,27 @@
 
 const nodemailer = require("nodemailer");
 
-// ── Brand config (override via env)
-const BRAND      = process.env.BRAND_NAME   || "Sugarlean";
-const BRAND_URL  = process.env.BRAND_URL    || "https://www.sugarlean.com.au";
-const ACCENT     = process.env.ACCENT_COLOR || "#FEC645";
-const LOGO_URL   =
-  process.env.LOGO_URL ||
-  "https://cdn.shopify.com/s/files/1/0508/5528/0818/files/SUGARLEAN_PTY_LTD_White.png?v=1751947986";
-const POLICY_URL = (process.env.POLICY_URL || "https://www.sugarlean.com.au/policies/privacy-policy").trim();
-const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || ""; // optional for footer
-const SUPPORT_PHONE = process.env.SUPPORT_PHONE || ""; // optional for footer
+/* ──────────────────────────────────────────────────────────────
+ * Brand config (override via env)
+ * ──────────────────────────────────────────────────────────── */
+const BRAND       = process.env.BRAND_NAME   || "Sugarlean";
+const BRAND_URL   = (process.env.BRAND_URL   || "https://www.sugarlean.com.au").trim();
+const ACCENT      = (process.env.ACCENT_COLOR || "#FEC645").trim();
+const LOGO_URL    = (process.env.LOGO_URL     ||
+  "https://cdn.shopify.com/s/files/1/0508/5528/0818/files/SUGARLEAN_PTY_LTD_White.png?v=1751947986").trim();
+const POLICY_URL  = (process.env.POLICY_URL   || "https://www.sugarlean.com.au/policies/privacy-policy").trim();
+const SUPPORT_EMAIL = (process.env.SUPPORT_EMAIL || "").trim(); // optional
+const SUPPORT_PHONE = (process.env.SUPPORT_PHONE || "").trim(); // optional
 
-// ── SMTP
+// displayHost: used in footer ("sugarlean.com.au" instead of full URL)
+const displayHost = (() => {
+  try { return new URL(BRAND_URL).host; }
+  catch { return BRAND_URL.replace(/^https?:\/\/(www\.)?/, ""); }
+})();
+
+/* ──────────────────────────────────────────────────────────────
+ * SMTP
+ * ──────────────────────────────────────────────────────────── */
 const host        = (process.env.EMAIL_HOST || "").trim();
 const port        = Number(process.env.EMAIL_PORT || 587);
 const secure      = (process.env.EMAIL_SECURE || "false").toString() === "true"; // 465 => true
@@ -26,21 +35,26 @@ const defaultTo   = (process.env.EMAIL_TO   || user || "").trim();
 const transporter = nodemailer.createTransport({
   host,
   port,
-  secure,
-  auth: { user, pass },
-  requireTLS: port === 587,
+  secure,                     // true for 465, false for 587
+  auth: user && pass ? { user, pass } : undefined,
+  requireTLS: port === 587,   // STARTTLS on 587
   tls: { minVersion: "TLSv1.2", servername: host },
 });
 
-// ── utils
+/* ──────────────────────────────────────────────────────────────
+ * utils
+ * ──────────────────────────────────────────────────────────── */
 const esc = (s = "") =>
   String(s)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+
 const yesNo = (b) => (b ? "Yes" : "No");
-const stripHtml = (html) => String(html).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+
+const stripHtml = (html) =>
+  String(html).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 
 // table row (supports raw HTML in value cell via { raw:true })
 function tableRow(label, value, { raw = false } = {}) {
@@ -84,6 +98,9 @@ function detailsTable(d) {
   </table>`;
 }
 
+/* ──────────────────────────────────────────────────────────────
+ * card shell
+ * ──────────────────────────────────────────────────────────── */
 function cardShell({ title, subtitle, bodyHtml, footerHtml }) {
   // Black banner header, rounded card, subtle shadow
   return `
@@ -114,7 +131,8 @@ function cardShell({ title, subtitle, bodyHtml, footerHtml }) {
         ${
           footerHtml ||
           `<p style="margin:10px 0 0 0;color:#9b9b9b;font-size:12px;font-family:Arial,Helvetica,sans-serif;">
-            Sent automatically from <a href="${BRAND_URL}" style="color:${ACCENT};text-decoration:none;">${BRAND_URL.replace(/^https?:\\/\\//,"")}</a>
+            Sent automatically from
+            <a href="${BRAND_URL}" style="color:${ACCENT};text-decoration:none;">${displayHost}</a>
           </p>`
         }
       </div>
@@ -122,12 +140,16 @@ function cardShell({ title, subtitle, bodyHtml, footerHtml }) {
   </div>`;
 }
 
-// ── helpers
+/* ──────────────────────────────────────────────────────────────
+ * helpers
+ * ──────────────────────────────────────────────────────────── */
 async function verifySmtp() {
   return transporter.verify();
 }
 
-// ── main: admin + applicant
+/* ──────────────────────────────────────────────────────────────
+ * main: admin + applicant
+ * ──────────────────────────────────────────────────────────── */
 async function sendSignupEmail(d) {
   const adminTo = defaultTo || user;
   const from    = defaultFrom || user;
@@ -186,7 +208,9 @@ async function sendSignupEmail(d) {
   return { ok: true };
 }
 
-// ── exports (required)
+/* ──────────────────────────────────────────────────────────────
+ * exports
+ * ──────────────────────────────────────────────────────────── */
 module.exports = {
   transporter,
   verifySmtp,
