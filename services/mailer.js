@@ -1,84 +1,150 @@
-// services/mailer.js
-// Sugarlean Mailer — sends Admin + Applicant emails using services/templates.js
-
+// services/mailer.js (SMTP version – Office 365 friendly)
 const nodemailer = require("nodemailer");
-const { adminTemplate, userTemplate } = require("./templates");
+const {
+  adminNotificationTemplate,
+  userConfirmationTemplate,
+} = require("./templates");
 
-/* ──────────────────────────────────────────────────────────────
- * SMTP (from env)
- * ──────────────────────────────────────────────────────────── */
-const host   = (process.env.EMAIL_HOST || "").trim();
-const port   = Number(process.env.EMAIL_PORT || 587);
-const secure = (process.env.EMAIL_SECURE || "false").toString() === "true"; // 465 => true
-const user   = (process.env.EMAIL_USER || "").trim();
-const pass   = (process.env.EMAIL_PASS || "").trim();
+/* -------------------- ENV -------------------- */
+const {
+  EMAIL_HOST = "smtp.office365.com", // Office 365/Exchange Online
+  EMAIL_PORT = "587",                // 587 STARTTLS (recommended), 465 for SMTPS
+  EMAIL_SECURE = "false",            // "true" only for port 465
+  EMAIL_USER,                        // required (full mailbox address)
+  EMAIL_PASS,                        // required (app password or mailbox password)
+  EMAIL_FROM,                        // optional: 'Sugarlean (Do not reply) <no-reply@sugarlean.com.au>'
+  ADMIN_EMAIL,                       // admin notification destination
+  BRAND_NAME = "Sugarlean",
+} = process.env;
 
+const FROM =
+  EMAIL_FROM ||
+  (EMAIL_USER
+    ? `${BRAND_NAME} (Do not reply) <${EMAIL_USER}>`
+    : `${BRAND_NAME} (Do not reply) <no-reply@sugarlean.com.au>`);
+
+/* -------------------- Transporter -------------------- */
+/**
+ * Office 365 tips:
+ * - Use port 587 with STARTTLS (secure=false) – most reliable.
+ * - Make sure SMTP AUTH is enabled for the mailbox.
+ * - If MFA is enabled, use an **App Password**, not the normal password.
+ * - Some tenants require "Authenticated SMTP" to be turned on for the user.
+ */
 const transporter = nodemailer.createTransport({
-  host,
-  port,
-  secure,                      // true for 465, false for 587
-  auth: user && pass ? { user, pass } : undefined,
-  requireTLS: port === 587,    // STARTTLS on 587
-  tls: { minVersion: "TLSv1.2", servername: host },
+  host: EMAIL_HOST,
+  port: Number(EMAIL_PORT),
+  secure: (EMAIL_SECURE || "false").toLowerCase() === "true", // true only for 465
+  auth:
+    EMAIL_USER && EMAIL_PASS
+      ? { user: EMAIL_USER, pass: EMAIL_PASS }
+      : undefined,
+  requireTLS: true,              // push STARTTLS on 587
+  tls: {
+    minVersion: "TLSv1.2",
+    // ciphers: "TLS_AES_256_GCM_SHA384:TLS_AES_128_GCM_SHA256:TLS_CHACHA20_POLY1305_SHA256",
+    // If you hit certificate-chain quirks, you can TEMPORARILY loosen this:
+    // rejectUnauthorized: false,
+  },
+  pool: true,                    // reuse connections (faster)
+  maxConnections: 3,
+  maxMessages: 20,
+  connectionTimeout: 10000,      // 10s
+  greetingTimeout: 10000,
+  socketTimeout: 15000,
 });
 
-/* ──────────────────────────────────────────────────────────────
- * Identities + Subjects
- * ──────────────────────────────────────────────────────────── */
-const FROM_NO_REPLY = `"Sugarlean Pty Ltd (Do not reply)" <${process.env.NO_REPLY_FROM || user || "no-reply@sugarlean.com.au"}>`;
-const FROM_ADMIN    = `"Sugarlean Orders" <${process.env.ADMIN_FROM || user || "orders@sugarlean.com.au"}>`;
-const ADMIN_TO      = (process.env.ADMIN_TO || user || "").trim();
+/* -------------------- Message builders -------------------- */
+function buildMessages(data) {
+  const adminSubject = "New Wholesale Application";
+  const userSubject  = "Thank you for your application! [DO NOT REPLY]";
 
-const SUBJECT_USER  = "Thank you for your application! [DO NOT REPLY]";
-const SUBJECT_ADMIN = "New wholesale application received";
+  const adminHTML = adminNotificationTemplate(data);
+  const userHTML  = userConfirmationTemplate(data);
 
-/* ──────────────────────────────────────────────────────────────
- * utils
- * ──────────────────────────────────────────────────────────── */
-const stripHtml = (html) =>
-  String(html).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  const adminText =
+    `New wholesale application\n\n` +
+    `Business Name: ${data.companyName}\n` +
+    `Contact Name: ${data.contactName}\n` +
+    `Contact Number: ${data.phone}\n` +
+    `Contact Email: ${data.email}\n` +
+    `ABN: ${data.abn}\n` +
+    `Address: ${data.streetAddress}, ${data.city}, ${data.state} ${data.postcode}, ${data.country}\n` +
+    `Note: ${data.note}\n` +
+    `Accepts Marketing: ${data.marketingOptIn ? "Yes" : "No"}\n` +
+    `Terms Accepted: ${data.policyAccepted ? "Yes" : "No"}\n`;
 
-/* ──────────────────────────────────────────────────────────────
- * Public: verify + send
- * ──────────────────────────────────────────────────────────── */
-async function verifySmtp() {
-  return transporter.verify();
+  const userText =
+    `Hi ${data.contactName || "Customer"},\n\n` +
+    `Thanks for applying for a ${BRAND_NAME} wholesale account${
+      data.companyName ? ` for ${data.companyName}` : ""
+    }.\n` +
+    `We've received your details and will review your submission within a few business days.\n` +
+    `If you don’t receive an update, please reply to this email.\n`;
+
+  return {
+    admin: {
+      from: FROM,
+      to: ADMIN_EMAIL || EMAIL_USER,
+      subject: adminSubject,
+      html: adminHTML,
+      text: adminText,
+      replyTo: ADMIN_EMAIL || EMAIL_USER,
+    },
+    user: {
+      from: FROM,
+      to: data.email,
+      subject: userSubject,
+      html: userHTML,
+      text: userText,
+      replyTo: ADMIN_EMAIL || EMAIL_USER,
+    },
+  };
 }
 
-async function sendSignupEmail(d) {
-  // 1) Admin notification (HTML from templates.js)
-  const adminHtml = adminTemplate(d);
-  const infoAdmin = await transporter.sendMail({
-    from: FROM_ADMIN,
-    to: ADMIN_TO || user,
-    replyTo: d.email || undefined,
-    subject: SUBJECT_ADMIN,
-    html: adminHtml,
-    text: stripHtml(adminHtml),
-  });
-  console.log(`✅ Admin email sent to ${ADMIN_TO || user}:`, infoAdmin.messageId);
-
-  // 2) Applicant confirmation (do-not-reply) — HTML from templates.js
-  if (d.email) {
-    const userHtml = userTemplate(d);
-    const infoUser = await transporter.sendMail({
-      from: FROM_NO_REPLY,
-      to: d.email,
-      subject: SUBJECT_USER,
-      html: userHtml,
-      text: stripHtml(userHtml),
-    });
-    console.log(`📩 Applicant confirmation sent to ${d.email}:`, infoUser.messageId);
+/* -------------------- Public API -------------------- */
+/**
+ * Send admin notification + user confirmation
+ */
+async function sendWholesaleEmails(data) {
+  if (!EMAIL_HOST || !EMAIL_USER || !EMAIL_PASS) {
+    const err = new Error("Mailer not configured (missing EMAIL_HOST/USER/PASS).");
+    err.step = "config";
+    throw err;
   }
 
-  return { ok: true };
+  const msgs = buildMessages(data);
+
+  try {
+    // send sequentially (clearer logs); you can parallelise with Promise.all
+    const admin = await transporter.sendMail(msgs.admin);
+    const user  = await transporter.sendMail(msgs.user);
+    return { admin, user };
+  } catch (e) {
+    // bubble a readable error back to the route
+    const err = new Error(e?.response || e?.message || "SMTP send failed");
+    err.step = "sendMail";
+    throw err;
+  }
 }
 
-/* ──────────────────────────────────────────────────────────────
- * exports
- * ──────────────────────────────────────────────────────────── */
+/**
+ * Optional: verify on boot
+ * - Does not send an email; checks if SMTP server is reachable & credentials work.
+ */
+async function verifyTransport() {
+  try {
+    await transporter.verify();   // nodemailer’s built-in check
+    return true;
+  } catch (e) {
+    console.warn("SMTP verify failed:", e?.message || e);
+    return false;
+  }
+}
+
 module.exports = {
   transporter,
-  verifySmtp,
-  sendSignupEmail,
+  sendWholesaleEmails,
+  sendSignupEmail: sendWholesaleEmails, // alias
+  verifyTransport,
 };

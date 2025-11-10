@@ -1,10 +1,22 @@
 // services/templates.js
-const BRAND_COLOR = "#FEC645"; // Sugarlean gold
+// --- Brand tokens (Sugarlean) ---
+const BRAND = {
+  YELLOW: "#FEC645",
+  BLACK:  "#0C0C0C",
+  BG:     "#F4F5F7",
+  TEXT:   "#222222",
+  SUBTLE: "#6F6F6F",
+  BORDER: "#ECECEC",
+  CARD:   "#FFFFFF",
+  RADIUS: 20,
+  WIDTH:  600
+};
+
+const SITE_URL = "https://www.sugarlean.com.au";
 const LOGO_URL =
   "https://cdn.shopify.com/s/files/1/0508/5528/0818/files/SUGARLEAN_PTY_LTD_White.png?v=1751947986";
-const SITE_URL = "https://www.sugarlean.com.au";
 
-// simple escape helper
+// ---------- helpers ----------
 const esc = (s = "") =>
   String(s)
     .replace(/&/g, "&amp;")
@@ -12,119 +24,193 @@ const esc = (s = "") =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
-// admin table row helper
+const yn = (v) => (v ? "Yes" : "No");
+
 const row = (label, value) => `
   <tr>
-    <th style="text-align:left;background:#f3f3f3;border:1px solid #e6e6e6;padding:12px 14px;width:42%;font-weight:600;">
-      ${esc(label)}
-    </th>
-    <td style="border:1px solid #e6e6e6;padding:12px 14px;">
-      ${esc(value ?? "")}
-    </td>
+    <th style="
+      width:200px;
+      background:#f3f3f3;
+      border:1px solid ${BRAND.BORDER};
+      padding:12px 14px;
+      font:600 14px/1.35 Arial, Helvetica, sans-serif;
+      color:${BRAND.TEXT};
+      text-align:left;">${esc(label)}</th>
+    <td style="
+      border:1px solid ${BRAND.BORDER};
+      padding:12px 14px;
+      font:400 14px/1.5 Arial, Helvetica, sans-serif;
+      color:${BRAND.TEXT};">${esc(value || "-")}</td>
   </tr>
 `;
 
-exports.adminTemplate = (data) => `
-<!DOCTYPE html>
+// ---------- base wrapper (no subtitle) ----------
+const base = ({ title, bodyHTML = "" }) => `
+<!doctype html>
 <html>
-  <body style="font-family:Poppins, Arial, sans-serif; background:#f7f7f7; margin:0; padding:48px;">
-    <div style="max-width:602px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 3px 10px rgba(0,0,0,0.08)">
-      <div style="background:#000;padding:32px;text-align:center;">
-        <img src="${LOGO_URL}" alt="Sugarlean Pty Ltd" style="width:200px;display:block;margin:auto;">
-      </div>
-
-      <div style="padding:40px 32px;">
-        <h2 style="text-align:center;font-size:24px;margin:0 0 10px;color:#222;">
-          New Wholesale <span style="background:${BRAND_COLOR};padding:2px 8px;border-radius:6px;">Application</span>
-        </h2>
-        <p style="text-align:center;color:#666;margin:0 0 20px;">
-          A new wholesale signup has been submitted through the Sugarlean website.
-        </p>
-
-        <table style="width:100%;border-collapse:collapse;margin-top:8px;">
-          ${row("Business Name", data.companyName)}
-          ${row("Contact Name", data.contactName)}
-          ${row("Contact Number", data.phone)}
-          ${row("Contact Email", data.email)}
-          ${row("ABN", data.abn)}
-          ${row("Street Address", data.streetAddress)}
-          ${row("City", data.city)}
-          ${row("State", data.state)}
-          ${row("Postcode", data.postCode)}
-          ${row("Country", data.country)}
-          ${data.note ? row("Note", data.note) : ""}
-          ${row("Accepts Marketing", data.marketingOptIn ? "Yes" : "No")}
-          ${row("Terms Accepted", data.policyAccepted ? "Yes" : "No")}
-        </table>
-
-        <p style="text-align:center;color:#888;margin-top:28px;font-size:13px;">
-          Sent automatically from <a href="${SITE_URL}" style="color:${BRAND_COLOR};text-decoration:none;">${SITE_URL.replace(/^https?:\/\//,"")}</a>
-        </p>
-      </div>
-    </div>
-  </body>
-</html>
-`;
-
-exports.userTemplate = (data) => `
-<!DOCTYPE html>
-<html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <title>Thank you for your application! [DO NOT REPLY]</title>
+    <meta charset="utf-8">
+    <meta name="x-apple-disable-message-reformatting">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>${esc(title)}</title>
   </head>
-  <body style="font-family:Poppins, Arial, sans-serif; background:#f6f6f6; margin:0; padding:48px;">
-    <div style="max-width:602px; margin:0 auto; background:#fff; border-radius:16px; overflow:hidden; box-shadow:0 3px 10px rgba(0,0,0,0.08);">
-      
-      <!-- Header -->
-      <div style="background:#000; padding:32px; text-align:center;">
-        <img src="${LOGO_URL}" alt="Sugarlean Pty Ltd" style="width:200px; display:block; margin:auto;" />
-      </div>
+  <body style="margin:0;padding:24px;background:${BRAND.BG};">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" width="100%" style="max-width:${BRAND.WIDTH}px;margin:0 auto;">
+      <tr><td>
 
-      <!-- Main content (tight, professional layout) -->
-      <div style="padding:40px 48px 0; color:#222;">
-        <h1 style="font-size:24px; margin:0; text-align:center;">Thank you for your application!</h1>
-        <p style="text-align:center; color:#777; margin-top:8px; margin-bottom:28px;">
-          Thanks for your application — we’ll review it shortly.
-        </p>
+        <!-- Card -->
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="
+          background:${BRAND.CARD};
+          border-radius:${BRAND.RADIUS}px;
+          overflow:hidden;
+          box-shadow:0 4px 16px rgba(0,0,0,0.08);">
 
-        <div style="max-width:520px;margin:0 auto;line-height:1.75;font-size:15px;">
-          <p style="margin:0 0 18px;">Hi ${esc(data.contactName)},</p>
+          <!-- Brand header (extra top margin above logo) -->
+          <tr>
+            <td style="background:${BRAND.BLACK};padding:44px 20px 18px 20px;text-align:center;">
+              <img src="${LOGO_URL}" alt="Sugarlean" width="160" style="display:inline-block;border:0;outline:none;text-decoration:none;">
+            </td>
+          </tr>
 
-          <p style="margin:0 0 18px;">
-            Thanks for applying for a wholesale account with Sugarlean. We’ve received your submission for
-            <strong>${esc(data.companyName)}</strong> and passed it to our team for review.
-          </p>
+          <!-- Title (plain, bold, no background) -->
+          <tr>
+            <td style="padding:26px 24px 22px 24px;text-align:center;">
+              <div style="font:700 28px/1.25 'Poppins', Arial, Helvetica, sans-serif;color:#2B2B2B;">
+                ${esc(title)}
+              </div>
+            </td>
+          </tr>
 
-          <p style="margin:0 0 18px;">
-            We’ll be in touch shortly. If you haven’t heard from us within <strong>3 business days</strong>—or if your
-            application is declined and you’d like to discuss—please contact us at
-            <a href="mailto:info@sugarlean.com.au" style="color:#222;text-decoration:none;border-bottom:1px solid #ddd;">info@sugarlean.com.au</a>.
-          </p>
+          <!-- Body -->
+          ${
+            bodyHTML
+              ? `<tr>
+                  <!-- extra bottom padding so footer sits away -->
+                  <td style="padding:0 24px 32px 24px;">${bodyHTML}</td>
+                </tr>`
+              : ""
+          }
 
-          <p style="margin:0 0 24px;">
-            Kind regards,<br>
-            Sugarlean Pty Ltd
-          </p>
-        </div>
-      </div>
+          <!-- Footer lines -->
+          <tr>
+            <td style="padding:12px 16px 6px 16px;text-align:center;">
+              <div style="font:500 12px/1.6 Arial, Helvetica, sans-serif;color:#9A9A9A;">
+                Sent automatically from
+                <a href="${SITE_URL}" style="color:${BRAND.YELLOW};text-decoration:none;">www.sugarlean.com.au</a>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 16px 18px 16px;text-align:center;">
+              <div style="font:400 12px/1.6 Arial, Helvetica, sans-serif;color:#111111;">
+                © ${new Date().getFullYear()} SUGARLEAN PTY LTD
+              </div>
+            </td>
+          </tr>
 
-      <!-- Notice bar -->
-      <div style="background:${BRAND_COLOR};padding:14px 24px;text-align:center;margin-top:28px;">
-        <p style="margin:0;color:#fff;font-size:13px;">
-          This is an automated message. Please do not reply to this email.
-        </p>
-      </div>
+        </table>
+        <!-- /Card -->
 
-      <!-- Footer -->
-      <div style="padding:14px 24px 24px; text-align:center; color:#9a9a9a; font-size:12px;">
-        © ${new Date().getFullYear()} <strong>SUGARLEAN PTY LTD</strong>
-        &nbsp; | &nbsp;
-        <a href="${SITE_URL}" style="color:#6f6f6f;text-decoration:none;">
-          ${SITE_URL.replace(/^https?:\/\/(www\.)?/, "")}
-        </a>
-      </div>
-    </div>
+      </td></tr>
+    </table>
   </body>
 </html>
 `;
+
+// ---------- templates ----------
+
+// Admin notification (no Policy row)
+function adminNotificationTemplate(data = {}) {
+  const title = "New Wholesale Application";
+
+  const detailsTable = `
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
+      ${row("Business Name",     data.companyName)}
+      ${row("Contact Name",      data.contactName)}
+      ${row("Contact Number",    data.phone)}
+      ${row("Contact Email",     data.email)}
+      ${row("ABN",               data.abn)}
+      ${row("Street Address",    data.streetAddress)}
+      ${row("City",              data.city)}
+      ${row("State",             data.state)}
+      ${row("Postcode",          data.postcode)}
+      ${row("Country",           data.country)}
+      ${row("Note",              data.note)}
+      ${row("Accepts Marketing", yn(data.marketingOptIn))}
+      ${row("Terms Accepted",    yn(data.policyAccepted))}
+    </table>
+  `;
+
+  return base({ title, bodyHTML: detailsTable });
+}
+
+// Customer confirmation (extra spacing + black greeting + larger gap before CTA)
+function userConfirmationTemplate(data = {}) {
+  const title = "Thank you for your application!";
+
+  const contactName = data.contactName || "Customer";
+  const company = data.companyName ? ` for <strong>${esc(data.companyName)}</strong>` : "";
+
+  const copy = `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+
+      <!-- Greeting (extra space + black text) -->
+      <tr>
+        <td style="text-align:center; padding:18px 0 18px 0;">
+          <div style="font:400 16px/1.7 Arial, Helvetica, sans-serif; color:${BRAND.TEXT};">
+            Hi ${esc(contactName)},
+          </div>
+        </td>
+      </tr>
+
+      <!-- Main copy (comfortable line-height + more bottom margin) -->
+      <tr>
+        <td style="text-align:center;">
+          <div style="display:inline-block; max-width:520px; text-align:left;">
+            <p style="margin:0 0 26px 0; font:400 15px/1.75 Arial, Helvetica, sans-serif; color:${BRAND.TEXT}; text-align:center;">
+              Thank you for applying for a wholesale account with <strong>Sugarlean</strong>${company}.<br>
+              Our team will review your submission and get back to you within a few business days.
+              If we need anything else, we’ll reach out using the contact details you provided.
+            </p>
+          </div>
+        </td>
+      </tr>
+
+      <!-- CTA button (more space before/after) -->
+      <tr>
+        <td style="text-align:center; padding:22px 0 26px 0;">
+          <a href="${SITE_URL}" style="
+              display:inline-block;
+              background:${BRAND.YELLOW};
+              color:#111111;
+              text-decoration:none;
+              font:700 14px/1 'Poppins', Arial, Helvetica, sans-serif;
+              padding:12px 24px;
+              border-radius:9999px;
+              box-shadow:0 2px 6px rgba(0,0,0,0.08);
+            ">
+            Visit us
+          </a>
+        </td>
+      </tr>
+
+    </table>
+  `;
+
+  return base({ title, bodyHTML: copy });
+}
+
+// Legacy aliases
+const adminTemplate = (d = {}) => adminNotificationTemplate(d);
+const userTemplate  = (d = {}) => userConfirmationTemplate(d);
+
+module.exports = {
+  BRAND,
+  SITE_URL,
+  LOGO_URL,
+  esc,
+  adminNotificationTemplate,
+  userConfirmationTemplate,
+  adminTemplate,
+  userTemplate,
+};
