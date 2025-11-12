@@ -1,150 +1,174 @@
-// services/mailer.js (SMTP version – Office 365 friendly)
+// services/mailer.js
+const qs = require("querystring");
 const nodemailer = require("nodemailer");
-const {
-  adminNotificationTemplate,
-  userConfirmationTemplate,
-} = require("./templates");
 
-/* -------------------- ENV -------------------- */
-const {
-  EMAIL_HOST = "smtp.office365.com", // Office 365/Exchange Online
-  EMAIL_PORT = "587",                // 587 STARTTLS (recommended), 465 for SMTPS
-  EMAIL_SECURE = "false",            // "true" only for port 465
-  EMAIL_USER,                        // required (full mailbox address)
-  EMAIL_PASS,                        // required (app password or mailbox password)
-  EMAIL_FROM,                        // optional: 'Sugarlean (Do not reply) <no-reply@sugarlean.com.au>'
-  ADMIN_EMAIL,                       // admin notification destination
-  BRAND_NAME = "Sugarlean",
-} = process.env;
+// Use node-fetch v2 (CommonJS). If you don't have it, run: npm i node-fetch@2
+let fetch;
+try {
+  fetch = require("node-fetch");
+} catch (e) {
+  throw new Error(
+    'Missing dependency "node-fetch". Run: npm i node-fetch@2 and redeploy.'
+  );
+}
 
-const FROM =
-  EMAIL_FROM ||
-  (EMAIL_USER
-    ? `${BRAND_NAME} (Do not reply) <${EMAIL_USER}>`
-    : `${BRAND_NAME} (Do not reply) <no-reply@sugarlean.com.au>`);
+// ---- import your templates ----
+// We try a few common export names so you don't have to rename your file.
+const tpl = require("./templates");
+const pick = (...names) => names.find((n) => typeof tpl[n] === "function");
 
-/* -------------------- Transporter -------------------- */
-/**
- * Office 365 tips:
- * - Use port 587 with STARTTLS (secure=false) – most reliable.
- * - Make sure SMTP AUTH is enabled for the mailbox.
- * - If MFA is enabled, use an **App Password**, not the normal password.
- * - Some tenants require "Authenticated SMTP" to be turned on for the user.
- */
-const transporter = nodemailer.createTransport({
-  host: EMAIL_HOST,
-  port: Number(EMAIL_PORT),
-  secure: (EMAIL_SECURE || "false").toLowerCase() === "true", // true only for 465
-  auth:
-    EMAIL_USER && EMAIL_PASS
-      ? { user: EMAIL_USER, pass: EMAIL_PASS }
-      : undefined,
-  requireTLS: true,              // push STARTTLS on 587
-  tls: {
-    minVersion: "TLSv1.2",
-    // ciphers: "TLS_AES_256_GCM_SHA384:TLS_AES_128_GCM_SHA256:TLS_CHACHA20_POLY1305_SHA256",
-    // If you hit certificate-chain quirks, you can TEMPORARILY loosen this:
-    // rejectUnauthorized: false,
-  },
-  pool: true,                    // reuse connections (faster)
-  maxConnections: 3,
-  maxMessages: 20,
-  connectionTimeout: 10000,      // 10s
-  greetingTimeout: 10000,
-  socketTimeout: 15000,
-});
+const adminTplName =
+  pick("renderAdminEmail", "adminEmail", "buildAdminEmail", "makeAdminEmail") ||
+  null;
+const userTplName =
+  pick("renderUserEmail", "userEmail", "buildUserEmail", "makeUserEmail") ||
+  null;
 
-/* -------------------- Message builders -------------------- */
-function buildMessages(data) {
-  const adminSubject = "New Wholesale Application";
-  const userSubject  = "Thank you for your application! [DO NOT REPLY]";
+if (!adminTplName || !userTplName) {
+  throw new Error(
+    "templates.js must export functions to build emails. Expected one of: renderAdminEmail/adminEmail/buildAdminEmail & renderUserEmail/userEmail/buildUserEmail"
+  );
+}
 
-  const adminHTML = adminNotificationTemplate(data);
-  const userHTML  = userConfirmationTemplate(data);
+// ---------- which transport? ----------
+const MAIL_TRANSPORT = (process.env.MAIL_TRANSPORT || "smtp").toLowerCase();
+const BRAND_FROM = process.env.EMAIL_FROM || process.env.GRAPH_SENDER;
 
-  const adminText =
-    `New wholesale application\n\n` +
-    `Business Name: ${data.companyName}\n` +
-    `Contact Name: ${data.contactName}\n` +
-    `Contact Number: ${data.phone}\n` +
-    `Contact Email: ${data.email}\n` +
-    `ABN: ${data.abn}\n` +
-    `Address: ${data.streetAddress}, ${data.city}, ${data.state} ${data.postcode}, ${data.country}\n` +
-    `Note: ${data.note}\n` +
-    `Accepts Marketing: ${data.marketingOptIn ? "Yes" : "No"}\n` +
-    `Terms Accepted: ${data.policyAccepted ? "Yes" : "No"}\n`;
+// ---------- SMTP path (not used when MAIL_TRANSPORT=graph) ----------
+function makeSmtpTransport() {
+  const host = process.env.EMAIL_HOST;
+  const port = Number(process.env.EMAIL_PORT || 587);
+  const secure = String(process.env.EMAIL_SECURE || "false").toLowerCase() === "true";
+  const user = process.env.EMAIL_USER;
+  const pass = process.env.EMAIL_PASS;
 
-  const userText =
-    `Hi ${data.contactName || "Customer"},\n\n` +
-    `Thanks for applying for a ${BRAND_NAME} wholesale account${
-      data.companyName ? ` for ${data.companyName}` : ""
-    }.\n` +
-    `We've received your details and will review your submission within a few business days.\n` +
-    `If you don’t receive an update, please reply to this email.\n`;
+  if (!host || !user || !pass) {
+    throw new Error("Mailer not configured (missing EMAIL_HOST/USER/PASS).");
+  }
 
-  return {
-    admin: {
-      from: FROM,
-      to: ADMIN_EMAIL || EMAIL_USER,
-      subject: adminSubject,
-      html: adminHTML,
-      text: adminText,
-      replyTo: ADMIN_EMAIL || EMAIL_USER,
+  return nodemailer.createTransport({ host, port, secure, auth: { user, pass } });
+}
+
+// ---------- Graph token ----------
+async function acquireGraphToken() {
+  const tenant = process.env.AZURE_TENANT_ID;
+  const clientId = process.env.AZURE_CLIENT_ID;
+  const clientSecret = process.env.AZURE_CLIENT_SECRET;
+
+  if (!tenant || !clientId || !clientSecret) {
+    throw new Error(
+      "Graph not configured (missing AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET)."
+    );
+  }
+
+  const resp = await fetch(
+    `https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: qs.stringify({
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: "client_credentials",
+        scope: "https://graph.microsoft.com/.default",
+      }),
+    }
+  );
+
+  const json = await resp.json();
+  if (!resp.ok) {
+    throw new Error(json.error_description || JSON.stringify(json));
+  }
+  return json.access_token;
+}
+
+// ---------- Graph send ----------
+async function graphSend({ to, subject, html }) {
+  const token = await acquireGraphToken();
+  const sender = process.env.GRAPH_SENDER;
+  if (!sender) throw new Error("GRAPH_SENDER not set.");
+
+  const payload = {
+    message: {
+      subject,
+      body: { contentType: "HTML", content: html },
+      toRecipients: [{ emailAddress: { address: to } }],
+      from: { emailAddress: { address: sender } },
     },
-    user: {
-      from: FROM,
-      to: data.email,
-      subject: userSubject,
-      html: userHTML,
-      text: userText,
-      replyTo: ADMIN_EMAIL || EMAIL_USER,
-    },
+    saveToSentItems: true,
   };
-}
 
-/* -------------------- Public API -------------------- */
-/**
- * Send admin notification + user confirmation
- */
-async function sendWholesaleEmails(data) {
-  if (!EMAIL_HOST || !EMAIL_USER || !EMAIL_PASS) {
-    const err = new Error("Mailer not configured (missing EMAIL_HOST/USER/PASS).");
-    err.step = "config";
-    throw err;
-  }
+  const resp = await fetch(
+    `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(sender)}/sendMail`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    }
+  );
 
-  const msgs = buildMessages(data);
-
-  try {
-    // send sequentially (clearer logs); you can parallelise with Promise.all
-    const admin = await transporter.sendMail(msgs.admin);
-    const user  = await transporter.sendMail(msgs.user);
-    return { admin, user };
-  } catch (e) {
-    // bubble a readable error back to the route
-    const err = new Error(e?.response || e?.message || "SMTP send failed");
-    err.step = "sendMail";
-    throw err;
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`Graph sendMail ${resp.status}: ${text}`);
   }
 }
 
-/**
- * Optional: verify on boot
- * - Does not send an email; checks if SMTP server is reachable & credentials work.
- */
+// ---------- unified send ----------
+async function sendMail({ to, subject, html }) {
+  if (MAIL_TRANSPORT === "graph") {
+    return graphSend({ to, subject, html });
+  }
+  const smtp = makeSmtpTransport();
+  const from = BRAND_FROM || process.env.EMAIL_USER;
+  return smtp.sendMail({ from, to, subject, html });
+}
+
+// Optional verify used at boot
 async function verifyTransport() {
   try {
-    await transporter.verify();   // nodemailer’s built-in check
+    if (MAIL_TRANSPORT === "graph") {
+      await acquireGraphToken();
+      console.log("Mail transport: graph (token OK)");
+      return true;
+    }
+    const smtp = makeSmtpTransport();
+    await smtp.verify();
+    console.log("Mail transport: smtp (verify OK)");
     return true;
   } catch (e) {
-    console.warn("SMTP verify failed:", e?.message || e);
+    console.log(
+      `Mail transport verify failed (${MAIL_TRANSPORT}):`,
+      e?.message || e
+    );
     return false;
   }
 }
 
+// ---------- public API used by routes ----------
+async function sendWholesaleEmails(data) {
+  const adminEmail = await tpl[adminTplName](data); // { subject, html }
+  const userEmail = await tpl[userTplName](data);   // { subject, html }
+
+  const results = { admin: false, user: false };
+
+  const adminTo = process.env.ADMIN_EMAIL;
+  if (adminTo) {
+    await sendMail({ to: adminTo, subject: adminEmail.subject, html: adminEmail.html });
+    results.admin = true;
+  }
+
+  if (data.email) {
+    await sendMail({ to: data.email, subject: userEmail.subject, html: userEmail.html });
+    results.user = true;
+  }
+
+  return results;
+}
+
 module.exports = {
-  transporter,
   sendWholesaleEmails,
-  sendSignupEmail: sendWholesaleEmails, // alias
   verifyTransport,
 };
