@@ -8,10 +8,14 @@ const morgan = require("morgan");
 
 const app = express();
 
-/* -------------------- trust proxy (Render) -------------------- */
+/* ---------------------------------------------
+ * Render / proxies
+ * -------------------------------------------*/
 app.set("trust proxy", true);
 
-/* -------------------- security headers -------------------- */
+/* ---------------------------------------------
+ * Security headers
+ * -------------------------------------------*/
 app.use(
   helmet({
     // allow loading assets across origins (e.g., CDN images in emails)
@@ -19,16 +23,23 @@ app.use(
   })
 );
 
-/* -------------------- CORS -------------------- */
+/* ---------------------------------------------
+ * CORS
+ * -------------------------------------------*/
 const DEFAULT_ORIGINS = [
   "https://www.sugarlean.com.au",
   "https://sugarlean.com.au",
-  "https://sugarlean.myshopify.com", // Shopify theme editor/preview
-  "http://localhost:3000",           // local dev FE
+  "https://sugarlean.myshopify.com", // Shopify preview/editor
+  "http://localhost:3000",           // local FE
 ];
 
-// Allow adding more via env: CORS_ORIGIN="https://foo.com,https://bar.com"
-const extraOrigin = (process.env.CORS_ORIGIN || "")
+// Accept either CORS_ORIGINS or CORS_ORIGIN (comma-separated)
+const corsEnv =
+  process.env.CORS_ORIGINS ||
+  process.env.CORS_ORIGIN ||
+  "";
+
+const extraOrigin = corsEnv
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
@@ -39,35 +50,43 @@ app.use(
   cors({
     origin: ALLOW_ORIGINS,
     methods: ["GET", "POST", "OPTIONS"],
-    // include the custom header used to protect the API
-    allowedHeaders: ["Content-Type", "X-WS-Token"],
+    allowedHeaders: ["Content-Type", "X-WS-Token", "x-ws-token"],
     credentials: false,
   })
 );
 
-/* -------------------- body parsing + logs -------------------- */
-app.use(express.json({ limit: "1mb" })); // payloads are small
+// quick response for preflights
+app.options("*", cors());
+
+/* ---------------------------------------------
+ * Body parser + logging
+ * -------------------------------------------*/
+app.use(express.json({ limit: "1mb" }));
 app.use(morgan("tiny"));
 
-/* -------------------- health -------------------- */
+/* ---------------------------------------------
+ * Health
+ * -------------------------------------------*/
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
-/* -------------------- protect wholesale API -------------------- */
-/**
- * Quick shared-secret guard so randoms can't post to your public endpoint.
- * Set WS_SHARED_TOKEN in Render env (use a long random string).
- * Your frontend must send header:  X-WS-Token: <same value>
- */
+/* ---------------------------------------------
+ * Optional shared-secret guard for /api/wholesale
+ * Enforced ONLY if WS_SHARED_TOKEN is set
+ * -------------------------------------------*/
+const REQUIRED_WS_TOKEN = (process.env.WS_SHARED_TOKEN || "").trim();
+
 app.use("/api/wholesale", (req, res, next) => {
-  const token = req.get("X-WS-Token") || "";
-  if (!process.env.WS_SHARED_TOKEN || token !== process.env.WS_SHARED_TOKEN) {
-    return res.status(401).json({ ok: false, error: "unauthorized" });
-  }
-  next();
+  if (!REQUIRED_WS_TOKEN) return next(); // no token configured → allow
+  const sent = (req.get("x-ws-token") || req.get("X-WS-Token") || "").trim();
+  if (sent === REQUIRED_WS_TOKEN) return next();
+  return res.status(401).json({ ok: false, error: "unauthorized" });
 });
 
-/* -------------------- routes -------------------- */
+/* ---------------------------------------------
+ * Routes
+ * -------------------------------------------*/
 app.use("/api/wholesale", require("./routes/wholesale"));
+
 try {
   // optional diagnostics (DNS/TCP/SMTP checks)
   app.use("/api/wholesale", require("./routes/diag"));
@@ -75,19 +94,22 @@ try {
   console.warn("diag routes not loaded:", e?.message || e);
 }
 
-/* -------------------- 404 + error handlers -------------------- */
+/* ---------------------------------------------
+ * 404 + error handler
+ * -------------------------------------------*/
 app.use((req, res) => {
-  res
-    .status(404)
-    .json({ ok: false, error: "Not Found", path: req.originalUrl });
+  res.status(404).json({ ok: false, error: "Not Found", path: req.originalUrl });
 });
 
 app.use((err, _req, res, _next) => {
-  console.error("Unhandled error:", err && err.stack ? err.stack : err);
+  console.error("Unhandled error:", err?.stack || err);
   res.status(500).json({ ok: false, error: "Internal Server Error" });
 });
 
-/* -------------------- optional SMTP verify on boot -------------------- */
+/* ---------------------------------------------
+ * Optional: verify transport on boot (SMTP or Graph),
+ * depending on how services/mailer.js is implemented.
+ * -------------------------------------------*/
 (async () => {
   try {
     const { verifyTransport } = require("./services/mailer");
@@ -96,15 +118,26 @@ app.use((err, _req, res, _next) => {
       console.log("SMTP verify:", ok ? "OK" : "Not ready");
     }
   } catch (e) {
-    // don’t block the app if mailer verify isn’t present
     console.warn("SMTP verify skipped:", e?.message || e);
   }
 })();
 
-/* -------------------- start server (Render-friendly) -------------------- */
+/* ---------------------------------------------
+ * Process guards (don’t crash silently)
+ * -------------------------------------------*/
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled Rejection:", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err);
+});
+
+/* ---------------------------------------------
+ * Start server (Render-friendly)
+ * -------------------------------------------*/
 const PORT = process.env.PORT || 4000;
+
 if (require.main === module) {
-  // Bind to 0.0.0.0 so Render can reach the process
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server listening on port ${PORT}`);
     console.log("Allowed CORS origins:", ALLOW_ORIGINS.join(", "));
