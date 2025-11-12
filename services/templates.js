@@ -9,7 +9,7 @@ const BRAND = {
   BORDER: "#ECECEC",
   CARD:   "#FFFFFF",
   RADIUS: 20,
-  WIDTH:  600
+  WIDTH:  600,
 };
 
 const SITE_URL = "https://www.sugarlean.com.au";
@@ -44,7 +44,7 @@ const row = (label, value) => `
   </tr>
 `;
 
-// ---------- base wrapper (no subtitle) ----------
+// ---------- base wrapper ----------
 const base = ({ title, bodyHTML = "" }) => `
 <!doctype html>
 <html>
@@ -65,14 +65,14 @@ const base = ({ title, bodyHTML = "" }) => `
           overflow:hidden;
           box-shadow:0 4px 16px rgba(0,0,0,0.08);">
 
-          <!-- Brand header (extra top margin above logo) -->
+          <!-- Brand header -->
           <tr>
             <td style="background:${BRAND.BLACK};padding:44px 20px 18px 20px;text-align:center;">
               <img src="${LOGO_URL}" alt="Sugarlean" width="160" style="display:inline-block;border:0;outline:none;text-decoration:none;">
             </td>
           </tr>
 
-          <!-- Title (plain, bold, no background) -->
+          <!-- Title -->
           <tr>
             <td style="padding:26px 24px 22px 24px;text-align:center;">
               <div style="font:700 28px/1.25 'Poppins', Arial, Helvetica, sans-serif;color:#2B2B2B;">
@@ -85,13 +85,12 @@ const base = ({ title, bodyHTML = "" }) => `
           ${
             bodyHTML
               ? `<tr>
-                  <!-- extra bottom padding so footer sits away -->
                   <td style="padding:0 24px 32px 24px;">${bodyHTML}</td>
                 </tr>`
               : ""
           }
 
-          <!-- Footer lines -->
+          <!-- Footer -->
           <tr>
             <td style="padding:12px 16px 6px 16px;text-align:center;">
               <div style="font:500 12px/1.6 Arial, Helvetica, sans-serif;color:#9A9A9A;">
@@ -118,8 +117,6 @@ const base = ({ title, bodyHTML = "" }) => `
 `;
 
 // ---------- templates ----------
-
-// Admin notification (no Policy row)
 function adminNotificationTemplate(data = {}) {
   const title = "New Wholesale Application";
 
@@ -144,17 +141,13 @@ function adminNotificationTemplate(data = {}) {
   return base({ title, bodyHTML: detailsTable });
 }
 
-// Customer confirmation (extra spacing + black greeting + larger gap before CTA)
 function userConfirmationTemplate(data = {}) {
-  const title = "Thank you for your application!";
-
+  const title = "Thank you for your application! [DO NOT REPLY]";
   const contactName = data.contactName || "Customer";
   const company = data.companyName ? ` for <strong>${esc(data.companyName)}</strong>` : "";
 
   const copy = `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-
-      <!-- Greeting (extra space + black text) -->
       <tr>
         <td style="text-align:center; padding:18px 0 18px 0;">
           <div style="font:400 16px/1.7 Arial, Helvetica, sans-serif; color:${BRAND.TEXT};">
@@ -162,8 +155,6 @@ function userConfirmationTemplate(data = {}) {
           </div>
         </td>
       </tr>
-
-      <!-- Main copy (comfortable line-height + more bottom margin) -->
       <tr>
         <td style="text-align:center;">
           <div style="display:inline-block; max-width:520px; text-align:left;">
@@ -175,8 +166,6 @@ function userConfirmationTemplate(data = {}) {
           </div>
         </td>
       </tr>
-
-      <!-- CTA button (more space before/after) -->
       <tr>
         <td style="text-align:center; padding:22px 0 26px 0;">
           <a href="${SITE_URL}" style="
@@ -193,11 +182,25 @@ function userConfirmationTemplate(data = {}) {
           </a>
         </td>
       </tr>
-
     </table>
   `;
 
   return base({ title, bodyHTML: copy });
+}
+
+// ---------- adapters expected by mailer.js ----------
+function renderAdminEmail(data = {}) {
+  return {
+    subject: "New Wholesale Application — Sugarlean",
+    html: adminNotificationTemplate(data),
+  };
+}
+
+function renderUserEmail(data = {}) {
+  return {
+    subject: "Sugarlean Wholesale — Application received",
+    html: userConfirmationTemplate(data),
+  };
 }
 
 // Legacy aliases
@@ -209,8 +212,13 @@ module.exports = {
   SITE_URL,
   LOGO_URL,
   esc,
+  row,
   adminNotificationTemplate,
   userConfirmationTemplate,
+  // names used by the mailer
+  renderAdminEmail,
+  renderUserEmail,
+  // legacy aliases
   adminTemplate,
   userTemplate,
 };
