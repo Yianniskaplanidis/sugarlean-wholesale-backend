@@ -142,7 +142,7 @@ function adminNotificationTemplate(data = {}) {
 }
 
 function userConfirmationTemplate(data = {}) {
-  const title = "Thank you for your application! [DO NOT REPLY]";
+  const title = "Thank you for your application!";
   const contactName = data.contactName || "Customer";
   const company = data.companyName ? ` for <strong>${esc(data.companyName)}</strong>` : "";
 
@@ -198,7 +198,7 @@ function renderAdminEmail(data = {}) {
 
 function renderUserEmail(data = {}) {
   return {
-    subject: "Sugarlean Wholesale — Application received",
+    subject: "Your Application received [DO NOT REPLY]",
     html: userConfirmationTemplate(data),
   };
 }
