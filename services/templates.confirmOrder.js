@@ -1,22 +1,7 @@
-// services/templates.js
-// --- Brand tokens (Sugarlean) ---
-const BRAND = {
-  YELLOW: "#FEC645",
-  BLACK:  "#0C0C0C",
-  BG:     "#F4F5F7",
-  TEXT:   "#222222",
-  SUBTLE: "#6F6F6F",
-  BORDER: "#ECECEC",
-  CARD:   "#FFFFFF",
-  RADIUS: 20,
-  WIDTH:  600,
-};
+// services/templates.confirmOrder.js
+const { BRAND, SITE_URL, LOGO_URL } = require("./templates");
 
-const SITE_URL = "https://www.sugarlean.com.au";
-const LOGO_URL =
-  "https://cdn.shopify.com/s/files/1/0508/5528/0818/files/SUGARLEAN_PTY_LTD_White.png?v=1751947986";
-
-// ---------- helpers ----------
+/* ---------- helpers ---------- */
 const esc = (s = "") =>
   String(s)
     .replace(/&/g, "&amp;")
@@ -24,8 +9,6 @@ const esc = (s = "") =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
-
-const yn = (v) => (v ? "Yes" : "No");
 
 const n = (v, fallback = 0) => {
   const num = Number(v);
@@ -52,7 +35,7 @@ const row = (label, value) => `
   </tr>
 `;
 
-// ---------- base wrapper ----------
+/* ---------- base wrapper (same as templates.js style) ---------- */
 const base = ({ title, bodyHTML = "" }) => `
 <!doctype html>
 <html>
@@ -66,21 +49,18 @@ const base = ({ title, bodyHTML = "" }) => `
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" width="100%" style="max-width:${BRAND.WIDTH}px;margin:0 auto;">
       <tr><td>
 
-        <!-- Card -->
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="
           background:${BRAND.CARD};
           border-radius:${BRAND.RADIUS}px;
           overflow:hidden;
           box-shadow:0 4px 16px rgba(0,0,0,0.08);">
 
-          <!-- Brand header -->
           <tr>
             <td style="background:${BRAND.BLACK};padding:44px 20px 18px 20px;text-align:center;">
               <img src="${LOGO_URL}" alt="Sugarlean" width="160" style="display:inline-block;border:0;outline:none;text-decoration:none;">
             </td>
           </tr>
 
-          <!-- Title -->
           <tr>
             <td style="padding:26px 24px 22px 24px;text-align:center;">
               <div style="font:700 28px/1.25 'Poppins', Arial, Helvetica, sans-serif;color:#2B2B2B;">
@@ -89,16 +69,12 @@ const base = ({ title, bodyHTML = "" }) => `
             </td>
           </tr>
 
-          <!-- Body -->
           ${
             bodyHTML
-              ? `<tr>
-                  <td style="padding:0 24px 32px 24px;">${bodyHTML}</td>
-                </tr>`
+              ? `<tr><td style="padding:0 24px 32px 24px;">${bodyHTML}</td></tr>`
               : ""
           }
 
-          <!-- Footer -->
           <tr>
             <td style="padding:12px 16px 6px 16px;text-align:center;">
               <div style="font:500 12px/1.6 Arial, Helvetica, sans-serif;color:#9A9A9A;">
@@ -116,7 +92,6 @@ const base = ({ title, bodyHTML = "" }) => `
           </tr>
 
         </table>
-        <!-- /Card -->
 
       </td></tr>
     </table>
@@ -124,100 +99,7 @@ const base = ({ title, bodyHTML = "" }) => `
 </html>
 `;
 
-/* =========================================================================
-   1) WHOLESALE APPLICATION (existing)
-   ========================================================================= */
-
-function adminNotificationTemplate(data = {}) {
-  const title = "New Wholesale Application";
-
-  const detailsTable = `
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
-      ${row("Business Name",     data.companyName)}
-      ${row("Contact Name",      data.contactName)}
-      ${row("Contact Number",    data.phone)}
-      ${row("Contact Email",     data.email)}
-      ${row("ABN",               data.abn)}
-      ${row("Street Address",    data.streetAddress)}
-      ${row("City",              data.city)}
-      ${row("State",             data.state)}
-      ${row("Postcode",          data.postcode)}
-      ${row("Country",           data.country)}
-      ${row("Note",              data.note)}
-      ${row("Accepts Marketing", yn(data.marketingOptIn))}
-      ${row("Terms Accepted",    yn(data.policyAccepted))}
-    </table>
-  `;
-
-  return base({ title, bodyHTML: detailsTable });
-}
-
-function userConfirmationTemplate(data = {}) {
-  const title = "Thank you for your application!";
-  const contactName = data.contactName || "Customer";
-  const company = data.companyName ? ` for <strong>${esc(data.companyName)}</strong>` : "";
-
-  const copy = `
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-      <tr>
-        <td style="text-align:center; padding:18px 0 18px 0;">
-          <div style="font:400 16px/1.7 Arial, Helvetica, sans-serif; color:${BRAND.TEXT};">
-            Hi ${esc(contactName)},
-          </div>
-        </td>
-      </tr>
-      <tr>
-        <td style="text-align:center;">
-          <div style="display:inline-block; max-width:520px; text-align:left;">
-            <p style="margin:0 0 26px 0; font:400 15px/1.75 Arial, Helvetica, sans-serif; color:${BRAND.TEXT}; text-align:center;">
-              Thank you for applying for a wholesale account with <strong>Sugarlean</strong>${company}.<br>
-              Our team will review your submission and get back to you within a few business days.
-              If we need anything else, we’ll reach out using the contact details you provided.
-            </p>
-          </div>
-        </td>
-      </tr>
-      <tr>
-        <td style="text-align:center; padding:22px 0 26px 0;">
-          <a href="${SITE_URL}" style="
-              display:inline-block;
-              background:${BRAND.YELLOW};
-              color:#111111;
-              text-decoration:none;
-              font:700 14px/1 'Poppins', Arial, Helvetica, sans-serif;
-              padding:12px 24px;
-              border-radius:9999px;
-              box-shadow:0 2px 6px rgba(0,0,0,0.08);
-            ">
-            Visit us
-          </a>
-        </td>
-      </tr>
-    </table>
-  `;
-
-  return base({ title, bodyHTML: copy });
-}
-
-// ---------- adapters expected by mailer.js ----------
-function renderAdminEmail(data = {}) {
-  return {
-    subject: "New Wholesale Application — Sugarlean",
-    html: adminNotificationTemplate(data),
-  };
-}
-
-function renderUserEmail(data = {}) {
-  return {
-    subject: "Your Application received [DO NOT REPLY]",
-    html: userConfirmationTemplate(data),
-  };
-}
-
-/* =========================================================================
-   2) WHOLESALE CONFIRM ORDER (NEW)
-   ========================================================================= */
-
+/* ---------- items table ---------- */
 function orderItemsTable(items = []) {
   const safeItems = Array.isArray(items) ? items : [];
 
@@ -231,42 +113,47 @@ function orderItemsTable(items = []) {
     </tr>
   `;
 
-  const rowsHTML = safeItems.map((it) => {
-    const title = it.title || "-";
-    const meta = [
-      it.sku ? `SKU: ${esc(it.sku)}` : "",
-      it.ref ? `REF: ${esc(it.ref)}` : "",
-      it.barcode ? `Barcode: ${esc(it.barcode)}` : "",
-      it.boxQty ? `Box QTY: ${esc(it.boxQty)}` : "",
-    ].filter(Boolean).join(" • ");
+  const rowsHTML = safeItems
+    .map((it) => {
+      const title = it.title || "-";
+      const meta = [
+        it.sku ? `SKU: ${esc(it.sku)}` : "",
+        it.ref ? `REF: ${esc(it.ref)}` : "",
+        it.barcode ? `Barcode: ${esc(it.barcode)}` : "",
+        it.boxQty ? `Box QTY: ${esc(it.boxQty)}` : "",
+      ]
+        .filter(Boolean)
+        .join(" • ");
 
-    const status = it.available === false ? "SOLD OUT / BACK ORDER" : "OK";
+      const soldOut = it.available === false;
+      const status = soldOut ? "SOLD OUT / BACK ORDER" : "OK";
 
-    return `
-      <tr>
-        <td style="padding:10px 12px;border:1px solid ${BRAND.BORDER};vertical-align:top;">
-          <div style="font:700 14px/1.35 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};">${esc(title)}</div>
-          ${
-            meta
-              ? `<div style="margin-top:4px;font:400 12px/1.5 Arial, Helvetica, sans-serif;color:${BRAND.SUBTLE};">${meta}</div>`
-              : ""
-          }
-        </td>
-        <td style="padding:10px 12px;border:1px solid ${BRAND.BORDER};text-align:center;font:400 14px/1.35 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};">
-          ${esc(String(n(it.qtyBoxes, 0)))}
-        </td>
-        <td style="padding:10px 12px;border:1px solid ${BRAND.BORDER};text-align:right;font:400 14px/1.35 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};">
-          ${money(it.price)}
-        </td>
-        <td style="padding:10px 12px;border:1px solid ${BRAND.BORDER};text-align:right;font:700 14px/1.35 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};">
-          ${money(it.lineTotal)}
-        </td>
-        <td style="padding:10px 12px;border:1px solid ${BRAND.BORDER};text-align:center;font:700 12px/1.3 Arial, Helvetica, sans-serif;color:${it.available === false ? "#B00020" : "#2B2B2B"};">
-          ${esc(status)}
-        </td>
-      </tr>
-    `;
-  }).join("");
+      return `
+        <tr>
+          <td style="padding:10px 12px;border:1px solid ${BRAND.BORDER};vertical-align:top;">
+            <div style="font:700 14px/1.35 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};">${esc(title)}</div>
+            ${
+              meta
+                ? `<div style="margin-top:4px;font:400 12px/1.5 Arial, Helvetica, sans-serif;color:${BRAND.SUBTLE};">${meta}</div>`
+                : ""
+            }
+          </td>
+          <td style="padding:10px 12px;border:1px solid ${BRAND.BORDER};text-align:center;font:400 14px/1.35 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};">
+            ${esc(String(n(it.qtyBoxes, 0)))}
+          </td>
+          <td style="padding:10px 12px;border:1px solid ${BRAND.BORDER};text-align:right;font:400 14px/1.35 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};">
+            ${money(it.price)}
+          </td>
+          <td style="padding:10px 12px;border:1px solid ${BRAND.BORDER};text-align:right;font:800 14px/1.35 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};">
+            ${money(it.lineTotal)}
+          </td>
+          <td style="padding:10px 12px;border:1px solid ${BRAND.BORDER};text-align:center;font:800 12px/1.3 Arial, Helvetica, sans-serif;color:${soldOut ? "#B00020" : "#2B2B2B"};">
+            ${esc(status)}
+          </td>
+        </tr>
+      `;
+    })
+    .join("");
 
   const empty = `
     <tr>
@@ -284,9 +171,9 @@ function orderItemsTable(items = []) {
   `;
 }
 
+/* ---------- templates ---------- */
 function confirmOrderAdminTemplate(data = {}) {
   const title = "Wholesale Order Submission";
-
   const c = data.customer || {};
   const items = Array.isArray(data.items) ? data.items : [];
   const subtotal =
@@ -312,7 +199,7 @@ function confirmOrderAdminTemplate(data = {}) {
     <div style="margin-top:12px;padding:12px 14px;border:1px solid ${BRAND.BORDER};border-radius:14px;background:#fafafa;">
       <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;">
         <div style="font:700 14px/1.3 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};">Subtotal</div>
-        <div style="font:800 16px/1.3 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};">${money(subtotal)}</div>
+        <div style="font:900 16px/1.3 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};">${money(subtotal)}</div>
       </div>
       <div style="margin-top:6px;font:400 12px/1.5 Arial, Helvetica, sans-serif;color:${BRAND.SUBTLE};">
         Email submission (not a Shopify checkout order).
@@ -320,10 +207,7 @@ function confirmOrderAdminTemplate(data = {}) {
     </div>
   `;
 
-  return base({
-    title,
-    bodyHTML: `${detailsTable}${itemsBlock}`,
-  });
+  return base({ title, bodyHTML: `${detailsTable}${itemsBlock}` });
 }
 
 function confirmOrderUserTemplate(data = {}) {
@@ -350,7 +234,7 @@ function confirmOrderUserTemplate(data = {}) {
 
             ${
               c.customerNumber
-                ? `<p style="margin:0 0 18px 0; font:700 14px/1.6 Arial, Helvetica, sans-serif; color:${BRAND.TEXT}; text-align:center;">
+                ? `<p style="margin:0 0 18px 0; font:800 14px/1.6 Arial, Helvetica, sans-serif; color:${BRAND.TEXT}; text-align:center;">
                     Customer Number: ${esc(c.customerNumber)}
                    </p>`
                 : ""
@@ -385,12 +269,11 @@ function confirmOrderUserTemplate(data = {}) {
   return base({ title, bodyHTML: copy });
 }
 
-// ---- adapters expected by mailer.js (Confirm Order) ----
+/* ---------- exports expected by mailer.js ---------- */
 function renderConfirmOrderAdminEmail(data = {}) {
   const c = data.customer || {};
-  const subject = `Wholesale Order Submission — ${c.customerNumber || "No Customer #"} — ${c.name || c.email || "Unknown"}`;
   return {
-    subject,
+    subject: `Wholesale Order Submission — ${c.customerNumber || "No Customer #"} — ${c.name || c.email || "Unknown"}`,
     html: confirmOrderAdminTemplate(data),
   };
 }
@@ -402,30 +285,9 @@ function renderConfirmOrderUserEmail(data = {}) {
   };
 }
 
-/* ---------------- legacy aliases (keep existing exports) ---------------- */
-const adminTemplate = (d = {}) => adminNotificationTemplate(d);
-const userTemplate  = (d = {}) => userConfirmationTemplate(d);
-
 module.exports = {
-  BRAND,
-  SITE_URL,
-  LOGO_URL,
-  esc,
-  row,
-
-  // Application templates
-  adminNotificationTemplate,
-  userConfirmationTemplate,
-  renderAdminEmail,
-  renderUserEmail,
-
-  // Confirm order templates (NEW)
   confirmOrderAdminTemplate,
   confirmOrderUserTemplate,
   renderConfirmOrderAdminEmail,
   renderConfirmOrderUserEmail,
-
-  // legacy aliases
-  adminTemplate,
-  userTemplate,
 };
