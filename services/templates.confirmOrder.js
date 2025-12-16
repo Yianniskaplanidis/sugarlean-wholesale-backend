@@ -1,4 +1,13 @@
 // services/templates.confirmOrder.js
+// NOTE:
+// This email template expects the storefront (Shopify Liquid + JS) to POST the REAL
+// customer + shipping details for the logged-in wholesale customer.
+// Your backend cannot “pull” Shopify customer info by itself unless you build an app + Admin API.
+// So make sure your frontend sends:
+//   data.customer = { name, email, phone, customerNumber, abn }
+//   data.shippingAddress = customer.default_address (object) or a formatted string
+//   data.extraNotes = textarea value (packing instructions)
+
 const { BRAND, SITE_URL, LOGO_URL } = require("./templates");
 
 /* ---------- helpers ---------- */
@@ -116,7 +125,7 @@ const fmtAddress = (addr) => {
     addr.company,
     addr.address1,
     addr.address2,
-    [addr.city, addr.province, addr.zip].filter(Boolean).join(" "),
+    [addr.city, addr.province || addr.province_code, addr.zip].filter(Boolean).join(" "),
     addr.country,
   ]
     .map(clean)
@@ -246,7 +255,18 @@ function orderItemsTable(items = []) {
       const title = clean(it.title) || "-";
       const barcode = clean(it.barcode);
 
-      const soldOut = it.available === false;
+      const qtyBoxes =
+        n(it.qtyBoxes, NaN) ||
+        n(it.boxes, NaN) ||
+        n(it.qty, NaN) ||
+        n(it.quantity, 0);
+
+      const soldOut =
+        it.available === false ||
+        it.soldOut === true ||
+        String(it.status || "").toLowerCase() === "backorder" ||
+        String(it.status || "").toLowerCase() === "back order";
+
       const statusText = soldOut ? "Back order" : "In Stock";
       const zebra = idx % 2 === 0 ? "#FFFFFF" : "#FCFCFD";
 
@@ -275,7 +295,7 @@ function orderItemsTable(items = []) {
           </td>
 
           <td style="padding:12px;border:1px solid ${BRAND.BORDER};text-align:center;font:900 14px/1.35 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};background:${zebra};">
-            ${esc(String(n(it.qtyBoxes, 0)))}
+            ${esc(String(qtyBoxes))}
           </td>
 
           <td style="padding:12px;border:1px solid ${BRAND.BORDER};text-align:center;background:${zebra};">
@@ -304,7 +324,7 @@ function orderItemsTable(items = []) {
 
 /* ---------- Extra notes block (packing instructions) ---------- */
 function extraNotesBlock(data = {}) {
-  // ✅ expected best: data.extraNotes
+  // ✅ expected best: data.extraNotes (from textarea)
   const notes =
     clean(data.extraNotes) ||
     clean(data.notes) ||
@@ -418,7 +438,7 @@ function confirmOrderAdminTemplate(data = {}) {
 }
 
 function confirmOrderUserTemplate(data = {}) {
-  // ✅ now matches admin layout (no intro / no CTA button)
+  // ✅ matches admin layout (no intro / no CTA button)
   const title = "Wholesale Order Summary";
   const bodyHTML = buildOrderEmailLayout(data);
   return base({ title, bodyHTML });
