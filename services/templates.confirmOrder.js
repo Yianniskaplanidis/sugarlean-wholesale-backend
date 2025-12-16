@@ -1,13 +1,4 @@
 // services/templates.confirmOrder.js
-// NOTE:
-// This email template expects the storefront (Shopify Liquid + JS) to POST the REAL
-// customer + shipping details for the logged-in wholesale customer.
-// Your backend cannot “pull” Shopify customer info by itself unless you build an app + Admin API.
-// So make sure your frontend sends:
-//   data.customer = { name, email, phone, customerNumber, abn }
-//   data.shippingAddress = customer.default_address (object) or a formatted string
-//   data.extraNotes = textarea value (packing instructions)
-
 const { BRAND, SITE_URL, LOGO_URL } = require("./templates");
 
 /* ---------- helpers ---------- */
@@ -125,7 +116,7 @@ const fmtAddress = (addr) => {
     addr.company,
     addr.address1,
     addr.address2,
-    [addr.city, addr.province || addr.province_code, addr.zip].filter(Boolean).join(" "),
+    [addr.city, addr.province, addr.zip].filter(Boolean).join(" "),
     addr.country,
   ]
     .map(clean)
@@ -143,14 +134,6 @@ const base = ({ title, bodyHTML = "" }) => `
     <meta name="x-apple-disable-message-reformatting">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>${esc(title)}</title>
-
-    <style>
-      @media screen and (max-width: 680px){
-        .sl-col{ display:block !important; width:100% !important; }
-        .sl-col-pad-r{ padding-right:0 !important; }
-        .sl-col-pad-l{ padding-left:0 !important; padding-top:14px !important; }
-      }
-    </style>
   </head>
 
   <body style="margin:0;padding:0;background:${BRAND.BG};">
@@ -255,18 +238,7 @@ function orderItemsTable(items = []) {
       const title = clean(it.title) || "-";
       const barcode = clean(it.barcode);
 
-      const qtyBoxes =
-        n(it.qtyBoxes, NaN) ||
-        n(it.boxes, NaN) ||
-        n(it.qty, NaN) ||
-        n(it.quantity, 0);
-
-      const soldOut =
-        it.available === false ||
-        it.soldOut === true ||
-        String(it.status || "").toLowerCase() === "backorder" ||
-        String(it.status || "").toLowerCase() === "back order";
-
+      const soldOut = it.available === false;
       const statusText = soldOut ? "Back order" : "In Stock";
       const zebra = idx % 2 === 0 ? "#FFFFFF" : "#FCFCFD";
 
@@ -295,7 +267,7 @@ function orderItemsTable(items = []) {
           </td>
 
           <td style="padding:12px;border:1px solid ${BRAND.BORDER};text-align:center;font:900 14px/1.35 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};background:${zebra};">
-            ${esc(String(qtyBoxes))}
+            ${esc(String(n(it.qtyBoxes, 0)))}
           </td>
 
           <td style="padding:12px;border:1px solid ${BRAND.BORDER};text-align:center;background:${zebra};">
@@ -324,7 +296,6 @@ function orderItemsTable(items = []) {
 
 /* ---------- Extra notes block (packing instructions) ---------- */
 function extraNotesBlock(data = {}) {
-  // ✅ expected best: data.extraNotes (from textarea)
   const notes =
     clean(data.extraNotes) ||
     clean(data.notes) ||
@@ -357,7 +328,7 @@ function extraNotesBlock(data = {}) {
   `;
 }
 
-/* ---------- shared layout builder (admin + user same layout) ---------- */
+/* ---------- shared layout builder (SINGLE COLUMN) ---------- */
 function buildOrderEmailLayout(data = {}) {
   const c = data.customer || {};
   const items = Array.isArray(data.items) ? data.items : [];
@@ -403,30 +374,22 @@ function buildOrderEmailLayout(data = {}) {
   const itemsBlock = `
     ${blockTitle("Items")}
     ${orderItemsTable(items)}
+    <div style="margin-top:10px;font:400 12px/1.6 Arial, Helvetica, sans-serif;color:${BRAND.SUBTLE};">
+      Items marked as <b>Back order</b> are currently unavailable and will be supplied when stock is available.
+    </div>
   `;
 
-  const twoCol = `
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-      <tr>
-        <td class="sl-col sl-col-pad-r" valign="top" style="width:64%;padding-right:14px;">
-          ${card(itemsBlock)}
-        </td>
-
-        <td class="sl-col sl-col-pad-l" valign="top" style="width:36%;padding-left:0;">
-          ${card(customerInfo)}
-          ${spacer(14)}
-          ${card(shippingInfo)}
-        </td>
-      </tr>
-    </table>
-  `;
-
+  // ✅ Single column order: Customer → Shipping → Items
   return `
     ${card(orderSummary)}
     ${spacer(14)}
     ${card(notesHTML)}
     ${spacer(14)}
-    ${twoCol}
+    ${card(customerInfo)}
+    ${spacer(14)}
+    ${card(shippingInfo)}
+    ${spacer(14)}
+    ${card(itemsBlock)}
   `;
 }
 
@@ -438,7 +401,6 @@ function confirmOrderAdminTemplate(data = {}) {
 }
 
 function confirmOrderUserTemplate(data = {}) {
-  // ✅ matches admin layout (no intro / no CTA button)
   const title = "Wholesale Order Summary";
   const bodyHTML = buildOrderEmailLayout(data);
   return base({ title, bodyHTML });
