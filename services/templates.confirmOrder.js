@@ -20,18 +20,6 @@ const escWithBreaks = (s = "") => esc(s).replace(/\r\n|\r|\n/g, "<br>");
 
 const clean = (v) => (v == null ? "" : String(v)).trim();
 
-const sectionTitle = (label) => `
-  <div style="
-    margin:0 0 10px 0;
-    font:900 13px/1.2 Arial, Helvetica, sans-serif;
-    letter-spacing:.14em;
-    text-transform:uppercase;
-    color:${BRAND.SUBTLE};
-  ">
-    ${esc(label)}
-  </div>
-`;
-
 const pill = (text, tone = "ok") => {
   const bg = tone === "bad" ? "#FEE2E2" : "#DCFCE7";
   const fg = tone === "bad" ? "#B00020" : "#166534";
@@ -96,7 +84,28 @@ const card = (innerHTML) => `
   </table>
 `;
 
-const spacer = (h = 14) => `<div style="height:${h}px; line-height:${h}px;">&nbsp;</div>`;
+const spacer = (h = 14) =>
+  `<div style="height:${h}px; line-height:${h}px;">&nbsp;</div>`;
+
+const blockTitle = (label) => `
+  <div style="
+    margin:0 0 10px 0;
+    font:900 16px/1.2 'Poppins', Arial, Helvetica, sans-serif;
+    color:${BRAND.TEXT};
+  ">
+    ${esc(label)}
+  </div>
+`;
+
+const blockSub = (text) => `
+  <div style="
+    margin:-4px 0 14px 0;
+    font:400 13px/1.6 Arial, Helvetica, sans-serif;
+    color:${BRAND.SUBTLE};
+  ">
+    ${esc(text)}
+  </div>
+`;
 
 const fmtAddress = (addr) => {
   if (!addr) return "";
@@ -125,6 +134,14 @@ const base = ({ title, bodyHTML = "" }) => `
     <meta name="x-apple-disable-message-reformatting">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>${esc(title)}</title>
+
+    <style>
+      @media screen and (max-width: 680px){
+        .sl-col{ display:block !important; width:100% !important; }
+        .sl-col-pad-r{ padding-right:0 !important; }
+        .sl-col-pad-l{ padding-left:0 !important; padding-top:14px !important; }
+      }
+    </style>
   </head>
 
   <body style="margin:0;padding:0;background:${BRAND.BG};">
@@ -230,7 +247,7 @@ function orderItemsTable(items = []) {
       const barcode = clean(it.barcode);
 
       const soldOut = it.available === false;
-      const statusText = soldOut ? "Back order" : "In Stock"; // ✅ instock instead of ok
+      const statusText = soldOut ? "Back order" : "In Stock";
       const zebra = idx % 2 === 0 ? "#FFFFFF" : "#FCFCFD";
 
       return `
@@ -285,52 +302,20 @@ function orderItemsTable(items = []) {
   `;
 }
 
-/* ---------- templates ---------- */
-function confirmOrderAdminTemplate(data = {}) {
-  const title = "Wholesale Order Submission";
-
-  const c = data.customer || {};
-  const items = Array.isArray(data.items) ? data.items : [];
-
-  // Shipping address can come from multiple shapes
-  const ship =
-    data.shippingAddress ||
-    c.shippingAddress ||
-    c.shipping_address ||
-    data.shipping_address ||
+/* ---------- Extra notes block (packing instructions) ---------- */
+function extraNotesBlock(data = {}) {
+  // ✅ expected best: data.extraNotes
+  const notes =
+    clean(data.extraNotes) ||
+    clean(data.notes) ||
+    clean(data.customerNotes) ||
+    clean(data.packingNotes) ||
+    clean(data.extraNote) ||
     "";
 
-  const shippingText = fmtAddress(ship);
-
-  /* PART 1: Order ID + Customer Number */
-  const part1 = `
-    ${sectionTitle("Order")}
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
-      ${row("Order ID", data.orderId)}
-      ${row("Customer Number", c.customerNumber)}
-    </table>
-  `;
-
-  /* PART 2: Customer info + Shipping address + Notes (sent) */
-  const part2 = `
-    ${sectionTitle("Customer Information")}
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
-      ${row("Customer name", c.name)}
-      ${row("Customer email", c.email)}
-      ${row("Customer phone", c.phone)}
-      ${row("Customer ABN", c.abn)}
-    </table>
-
-    ${spacer(14)}
-
-    ${sectionTitle("Shipping Address")}
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
-      ${row("Customer shipping address", shippingText || "-", { multiline: true })}
-    </table>
-
-    ${spacer(14)}
-
-    ${sectionTitle("Notes (sent)")}
+  return `
+    ${blockTitle("Extra notes")}
+    ${blockSub("Extra notes (optional) — e.g. packing instructions")}
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
       <tr>
         <td style="
@@ -341,95 +326,102 @@ function confirmOrderAdminTemplate(data = {}) {
           font:400 13px/1.65 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
           color:${BRAND.TEXT};
         ">
-          ${data.note ? escWithBreaks(String(data.note)) : `<span style="color:${BRAND.SUBTLE};">-</span>`}
+          ${
+            notes
+              ? escWithBreaks(String(notes))
+              : `<span style="color:${BRAND.SUBTLE};">-</span>`
+          }
+        </td>
+      </tr>
+    </table>
+  `;
+}
+
+/* ---------- shared layout builder (admin + user same layout) ---------- */
+function buildOrderEmailLayout(data = {}) {
+  const c = data.customer || {};
+  const items = Array.isArray(data.items) ? data.items : [];
+
+  const ship =
+    data.shippingAddress ||
+    c.shippingAddress ||
+    c.shipping_address ||
+    data.shipping_address ||
+    "";
+
+  const shippingText = fmtAddress(ship);
+
+  const orderSummary = `
+    ${blockTitle("Your Order")}
+    ${blockSub("Review your wholesale order summary below.")}
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
+      ${row("Order ID", data.orderId)}
+      ${row("Customer Number", c.customerNumber)}
+      ${row("ABN", c.abn)}
+    </table>
+  `;
+
+  const notesHTML = extraNotesBlock(data);
+
+  const customerInfo = `
+    ${blockTitle("Customer Information")}
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
+      ${row("Customer name", c.name)}
+      ${row("Customer email", c.email)}
+      ${row("Customer phone", c.phone)}
+      ${row("ABN", c.abn)}
+    </table>
+  `;
+
+  const shippingInfo = `
+    ${blockTitle("Shipping Address")}
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
+      ${row("Customer shipping address", shippingText || "-", { multiline: true })}
+    </table>
+  `;
+
+  const itemsBlock = `
+    ${blockTitle("Items")}
+    ${orderItemsTable(items)}
+  `;
+
+  const twoCol = `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+      <tr>
+        <td class="sl-col sl-col-pad-r" valign="top" style="width:64%;padding-right:14px;">
+          ${card(itemsBlock)}
+        </td>
+
+        <td class="sl-col sl-col-pad-l" valign="top" style="width:36%;padding-left:0;">
+          ${card(customerInfo)}
+          ${spacer(14)}
+          ${card(shippingInfo)}
         </td>
       </tr>
     </table>
   `;
 
-  /* PART 3: Items */
-  const part3 = `
-    ${sectionTitle("Items")}
-    ${orderItemsTable(items)}
-  `;
-
-  const topBadges = `
-    <div style="text-align:center;">
-      ${data.orderId ? pill(`Order ID: ${data.orderId}`, "ok") : ""}
-      ${
-        c.customerNumber
-          ? `<span style="display:inline-block;margin-left:8px;">${pill(`Customer #: ${c.customerNumber}`, "ok")}</span>`
-          : ""
-      }
-      ${
-        data.shop
-          ? `<span style="display:inline-block;margin-left:8px;">${pill(String(data.shop), "ok")}</span>`
-          : ""
-      }
-    </div>
-  `;
-
-  const bodyHTML = `
-    ${topBadges}
-    ${spacer(16)}
-    ${card(part1)}
+  return `
+    ${card(orderSummary)}
     ${spacer(14)}
-    ${card(part2)}
+    ${card(notesHTML)}
     ${spacer(14)}
-    ${card(part3)}
+    ${twoCol}
   `;
+}
 
+/* ---------- templates ---------- */
+function confirmOrderAdminTemplate(data = {}) {
+  const title = "Wholesale Order Summary";
+  const bodyHTML = buildOrderEmailLayout(data);
   return base({ title, bodyHTML });
 }
 
 function confirmOrderUserTemplate(data = {}) {
-  const title = "We received your wholesale order!";
-  const c = data.customer || {};
-
-  const orderIdLine = data.orderId
-    ? `<div style="margin:10px 0 0 0;text-align:center;">${pill(`Order ID: ${data.orderId}`, "ok")}</div>`
-    : "";
-
-  const customerNumLine = c.customerNumber
-    ? `<div style="margin:10px 0 0 0;text-align:center;">${pill(`Customer #: ${c.customerNumber}`, "ok")}</div>`
-    : "";
-
-  const copy = `
-    <div style="text-align:center;">
-      <div style="font:400 16px/1.7 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};">
-        Hi ${esc(c.name || "there")},
-      </div>
-
-      <div style="margin-top:10px;font:400 15px/1.75 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};">
-        Thanks! We’ve received your wholesale order submission and our team will process it shortly.<br>
-        If we need anything else, we’ll contact you using the details on your account.
-      </div>
-
-      ${orderIdLine}
-      ${customerNumLine}
-
-      <div style="margin-top:14px;font:400 13px/1.6 Arial, Helvetica, sans-serif;color:${BRAND.SUBTLE};">
-        This is a confirmation of your submission (not a Shopify checkout order).
-      </div>
-
-      <div style="margin-top:18px;">
-        <a href="${SITE_URL}/pages/wholesale-make-an-order" style="
-          display:inline-block;
-          background:${BRAND.YELLOW};
-          color:#111111;
-          text-decoration:none;
-          font:900 14px/1 'Poppins', Arial, Helvetica, sans-serif;
-          padding:12px 22px;
-          border-radius:9999px;
-          box-shadow:0 2px 8px rgba(0,0,0,0.10);
-        ">
-          Back to Wholesale Shopping
-        </a>
-      </div>
-    </div>
-  `;
-
-  return base({ title, bodyHTML: card(copy) });
+  // ✅ now matches admin layout (no intro / no CTA button)
+  const title = "Wholesale Order Summary";
+  const bodyHTML = buildOrderEmailLayout(data);
+  return base({ title, bodyHTML });
 }
 
 /* ---------- exports expected by mailer.js ---------- */

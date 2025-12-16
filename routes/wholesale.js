@@ -149,14 +149,17 @@ router.post("/apply", async (req, res) => {
         user: data.email,
       });
     } catch (err) {
-      console.error("💥 /apply email send failed (background):", err?.message || err);
+      console.error(
+        "💥 /apply email send failed (background):",
+        err?.message || err
+      );
     }
   });
 });
 
 /**
  * POST /api/wholesale/apply-sync
- * Same validation but waits for SMTP. Use only for local/Postman debugging.
+ * Same validation but waits for SMTP/Graph. Use only for local/Postman debugging.
  */
 router.post("/apply-sync", async (req, res) => {
   const data = buildPayload(req.body, req);
@@ -178,5 +181,13 @@ router.post("/apply-sync", async (req, res) => {
     });
   }
 });
+
+/**
+ * ✅ Mount confirm-order routes here so they become:
+ * - /api/wholesale/confirm-order
+ * - /api/wholesale/confirm-order-sync
+ * - /api/wholesale/confirm-order/ping
+ */
+router.use("/", require("./confirmOrder"));
 
 module.exports = router;
