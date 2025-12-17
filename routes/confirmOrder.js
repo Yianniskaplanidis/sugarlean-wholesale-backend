@@ -6,6 +6,7 @@ const { sendConfirmOrderEmails } = require("../services/mailer");
 
 /* ----------------------------- helpers ----------------------------- */
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
+
 const t = (v) => (v == null ? "" : String(v).trim());
 const clampStr = (v, max = 2000) => {
   const s = t(v);
@@ -22,6 +23,33 @@ function getIp(req) {
 }
 function getUa(req) {
   return req.headers["user-agent"] || "";
+}
+
+function sanitizeAddress(addr) {
+  if (!addr) return null;
+
+  // allow string address
+  if (typeof addr === "string") return clampStr(addr, 1200);
+
+  if (typeof addr !== "object") return null;
+
+  const pick = (k, max = 200) => clampStr(addr[k], max);
+
+  return {
+    name: pick("name", 200) || pick("full_name", 200),
+    first_name: pick("first_name", 120),
+    last_name: pick("last_name", 120),
+    company: pick("company", 200),
+    address1: pick("address1", 240),
+    address2: pick("address2", 240),
+    city: pick("city", 160),
+    province: pick("province", 160),
+    province_code: pick("province_code", 20),
+    zip: pick("zip", 30) || pick("postal_code", 30),
+    country: pick("country", 120),
+    country_code: pick("country_code", 10),
+    phone: pick("phone", 80),
+  };
 }
 
 /**
@@ -72,15 +100,16 @@ function buildConfirmOrderPayload(reqBody, req) {
         t(it.title) ||
         t(it.product_title) ||
         t(it.productTitle) ||
-        t(it.name),
+        t(it.name) ||
+        "",
 
-      sku: t(it.sku) || t(it.SKU) || t(it.variant_sku) || t(it.variantSku),
+      sku: t(it.sku) || t(it.SKU) || t(it.variant_sku) || t(it.variantSku) || "",
 
-      ref: t(it.ref) || t(it.ref_number) || t(it.refNumber),
+      ref: t(it.ref) || t(it.ref_number) || t(it.refNumber) || "",
 
-      barcode: t(it.barcode) || t(it.barcode_override) || t(it.barcodeOverride),
+      barcode: t(it.barcode) || t(it.barcode_override) || t(it.barcodeOverride) || "",
 
-      boxQty: t(it.boxQty) || t(it.box_quantity) || t(it.boxQuantity),
+      boxQty: t(it.boxQty) || t(it.box_quantity) || t(it.boxQuantity) || "",
 
       qtyBoxes: asNum(qtyBoxes, 0),
       price: asNum(price, 0),
@@ -96,14 +125,64 @@ function buildConfirmOrderPayload(reqBody, req) {
     asNum(totalsObj.sub_total, NaN) ||
     items.reduce((sum, it) => sum + asNum(it.lineTotal, 0), 0);
 
+  // ✅ IMPORTANT: keep what your Shopify page posts (so email template gets real values)
+  const shippingAddress = sanitizeAddress(
+    b.shippingAddress ||
+      b.shipping_address ||
+      b.shipping ||
+      customerObj.shippingAddress ||
+      customerObj.shipping_address ||
+      null
+  );
+
+  const extraNotes = clampStr(
+    b.extraNotes ||
+      b.extra_notes ||
+      b.customerNotes ||
+      b.customer_notes ||
+      b.packingNotes ||
+      b.packing_notes ||
+      b.notesOnly ||
+      b.extraNote ||
+      "",
+    2000
+  );
+
+  const customerPhone = clampStr(
+    customerObj.phone ||
+      b.customerPhone ||
+      b.phone ||
+      (shippingAddress && typeof shippingAddress === "object" ? shippingAddress.phone : "") ||
+      "",
+    80
+  );
+
+  const customerAbn = clampStr(
+    customerObj.abn ||
+      customerObj.abnNumber ||
+      customerObj.abn_number ||
+      b.abn ||
+      b.abnNumber ||
+      b.abn_number ||
+      "",
+    80
+  );
+
   return {
     shop: clampStr(b.shop || b.shopDomain || b.domain, 120),
     orderId: clampStr(b.orderId || b.order_id || b.orderNumber || b.order_number, 80),
-    note: clampStr(b.note || b.message || b.notes, 2000),
+
+    // keep your existing combined note/body too (if you still want it)
+    note: clampStr(b.note || b.message || b.notes, 4000),
+
+    // ✅ NEW: fields used by templates.confirmOrder.js
+    extraNotes,
+    shippingAddress,
 
     customer: {
       name: clampStr(customerObj.name || b.customerName || b.name, 200),
       email: clampStr(customerObj.email || b.customerEmail || b.email, 200),
+      phone: customerPhone,
       customerNumber: clampStr(
         customerObj.customerNumber ||
           customerObj.customer_number ||
@@ -111,6 +190,7 @@ function buildConfirmOrderPayload(reqBody, req) {
           b.customer_number,
         80
       ),
+      abn: customerAbn,
     },
 
     items,
@@ -130,11 +210,7 @@ function validateConfirmOrderPayload(data) {
   const customerNumber = t(data.customer?.customerNumber);
 
   if (!email && !customerNumber) {
-    return {
-      ok: false,
-      status: 422,
-      error: "Missing customer email or customer number",
-    };
+    return { ok: false, status: 422, error: "Missing customer email or customer number" };
   }
 
   if (email && !EMAIL_RE.test(email)) {
@@ -155,7 +231,6 @@ function validateConfirmOrderPayload(data) {
 
 /* ------------------------------ routes ------------------------------ */
 
-// quick router check
 router.get("/confirm-order/ping", (_req, res) =>
   res.json({ ok: true, route: "confirm-order" })
 );
@@ -186,6 +261,8 @@ router.post("/confirm-order", async (req, res) => {
         toUser: !!info?.user,
         customer: data.customer?.email || data.customer?.customerNumber,
         items: data.items?.length || 0,
+        hasShipping: !!data.shippingAddress,
+        hasExtraNotes: !!t(data.extraNotes),
       });
     } catch (err) {
       console.error("💥 Confirm-order send failed (background):", err?.message || err);

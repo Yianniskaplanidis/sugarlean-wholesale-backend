@@ -1,4 +1,9 @@
 // services/templates.confirmOrder.js
+// Expects frontend to POST:
+//   data.customer = { name, email, phone, customerNumber, abn }
+//   data.shippingAddress = object OR string
+//   data.extraNotes = textarea value
+
 const { BRAND, SITE_URL, LOGO_URL } = require("./templates");
 
 /* ---------- helpers ---------- */
@@ -10,15 +15,13 @@ const esc = (s = "") =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 
+const escWithBreaks = (s = "") => esc(s).replace(/\r\n|\r|\n/g, "<br>");
+const clean = (v) => (v == null ? "" : String(v)).trim();
+
 const n = (v, fallback = 0) => {
   const num = Number(v);
   return Number.isFinite(num) ? num : fallback;
 };
-
-// Preserve new lines in email while staying safe
-const escWithBreaks = (s = "") => esc(s).replace(/\r\n|\r|\n/g, "<br>");
-
-const clean = (v) => (v == null ? "" : String(v)).trim();
 
 const pill = (text, tone = "ok") => {
   const bg = tone === "bad" ? "#FEE2E2" : "#DCFCE7";
@@ -27,7 +30,7 @@ const pill = (text, tone = "ok") => {
   return `
     <span style="
       display:inline-block;
-      padding:6px 10px;
+      padding:5px 9px;
       border-radius:999px;
       border:1px solid ${bd};
       background:${bg};
@@ -36,9 +39,7 @@ const pill = (text, tone = "ok") => {
       letter-spacing:.06em;
       text-transform:uppercase;
       white-space:nowrap;
-    ">
-      ${esc(text)}
-    </span>
+    ">${esc(text)}</span>
   `;
 };
 
@@ -48,22 +49,19 @@ const row = (label, value, { multiline = false } = {}) => {
 
   return `
     <tr>
-      <th style="
-        width:190px;
-        background:#F7F7F7;
-        border:1px solid ${BRAND.BORDER};
-        padding:12px 14px;
-        font:900 13px/1.35 Arial, Helvetica, sans-serif;
-        letter-spacing:.02em;
-        color:${BRAND.TEXT};
-        text-align:left;
-        vertical-align:top;
-      ">${esc(label)}</th>
-
       <td style="
+        width:170px;
+        padding:10px 12px;
         border:1px solid ${BRAND.BORDER};
-        padding:12px 14px;
-        font:400 14px/1.6 Arial, Helvetica, sans-serif;
+        background:#F7F7F7;
+        font:900 12px/1.35 Arial, Helvetica, sans-serif;
+        color:${BRAND.TEXT};
+        vertical-align:top;
+      ">${esc(label)}</td>
+      <td style="
+        padding:10px 12px;
+        border:1px solid ${BRAND.BORDER};
+        font:400 13px/1.6 Arial, Helvetica, sans-serif;
         color:${BRAND.TEXT};
         vertical-align:top;
       ">${cell}</td>
@@ -78,46 +76,36 @@ const card = (innerHTML) => `
     border-radius:${BRAND.RADIUS}px;
     overflow:hidden;
   ">
-    <tr><td style="padding:18px 18px;">
+    <tr><td style="padding:14px 14px;">
       ${innerHTML}
     </td></tr>
   </table>
 `;
 
-const spacer = (h = 14) =>
+const spacer = (h = 12) =>
   `<div style="height:${h}px; line-height:${h}px;">&nbsp;</div>`;
 
 const blockTitle = (label) => `
   <div style="
     margin:0 0 10px 0;
-    font:900 16px/1.2 'Poppins', Arial, Helvetica, sans-serif;
+    font:900 15px/1.2 'Poppins', Arial, Helvetica, sans-serif;
     color:${BRAND.TEXT};
-  ">
-    ${esc(label)}
-  </div>
-`;
-
-const blockSub = (text) => `
-  <div style="
-    margin:-4px 0 14px 0;
-    font:400 13px/1.6 Arial, Helvetica, sans-serif;
-    color:${BRAND.SUBTLE};
-  ">
-    ${esc(text)}
-  </div>
+  ">${esc(label)}</div>
 `;
 
 const fmtAddress = (addr) => {
   if (!addr) return "";
+
   if (typeof addr === "string") return addr;
 
   const parts = [
-    addr.name,
+    addr.name || [addr.first_name, addr.last_name].filter(Boolean).join(" "),
     addr.company,
     addr.address1,
     addr.address2,
-    [addr.city, addr.province, addr.zip].filter(Boolean).join(" "),
+    [addr.city, addr.province || addr.province_code, addr.zip].filter(Boolean).join(" "),
     addr.country,
+    addr.phone ? `Phone: ${addr.phone}` : "",
   ]
     .map(clean)
     .filter(Boolean);
@@ -139,7 +127,7 @@ const base = ({ title, bodyHTML = "" }) => `
   <body style="margin:0;padding:0;background:${BRAND.BG};">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${BRAND.BG};">
       <tr>
-        <td style="padding:26px 14px;">
+        <td style="padding:22px 14px;">
           <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" width="100%" style="max-width:${BRAND.WIDTH}px;margin:0 auto;">
 
             <!-- Header -->
@@ -147,11 +135,11 @@ const base = ({ title, bodyHTML = "" }) => `
               <td style="
                 background:${BRAND.BLACK};
                 border-radius:${BRAND.RADIUS}px ${BRAND.RADIUS}px 0 0;
-                padding:44px 18px 20px 18px;
+                padding:34px 18px 18px 18px;
                 text-align:center;
               ">
-                <img src="${LOGO_URL}" alt="Sugarlean" width="160" style="display:inline-block;border:0;outline:none;text-decoration:none;">
-                <div style="margin-top:12px;font:900 12px/1 Arial, Helvetica, sans-serif;letter-spacing:.18em;text-transform:uppercase;color:${BRAND.YELLOW};">
+                <img src="${LOGO_URL}" alt="Sugarlean" width="150" style="display:inline-block;border:0;outline:none;text-decoration:none;">
+                <div style="margin-top:10px;font:900 11px/1 Arial, Helvetica, sans-serif;letter-spacing:.18em;text-transform:uppercase;color:${BRAND.YELLOW};">
                   Wholesale Portal
                 </div>
               </td>
@@ -163,13 +151,13 @@ const base = ({ title, bodyHTML = "" }) => `
                 background:${BRAND.CARD};
                 border-left:1px solid ${BRAND.BORDER};
                 border-right:1px solid ${BRAND.BORDER};
-                padding:22px 22px 6px 22px;
+                padding:18px 18px 8px 18px;
                 text-align:center;
               ">
-                <div style="font:900 26px/1.25 'Poppins', Arial, Helvetica, sans-serif;color:${BRAND.TEXT};">
+                <div style="font:900 22px/1.25 'Poppins', Arial, Helvetica, sans-serif;color:${BRAND.TEXT};">
                   ${esc(title)}
                 </div>
-                <div style="margin-top:8px;height:3px;width:92px;background:${BRAND.YELLOW};border-radius:999px;display:inline-block;"></div>
+                <div style="margin-top:8px;height:3px;width:84px;background:${BRAND.YELLOW};border-radius:999px;display:inline-block;"></div>
               </td>
             </tr>
 
@@ -182,7 +170,7 @@ const base = ({ title, bodyHTML = "" }) => `
                 background:${BRAND.CARD};
                 border-left:1px solid ${BRAND.BORDER};
                 border-right:1px solid ${BRAND.BORDER};
-                padding:18px 22px 18px 22px;
+                padding:14px 18px 16px 18px;
               ">
                 ${bodyHTML}
               </td>
@@ -197,7 +185,7 @@ const base = ({ title, bodyHTML = "" }) => `
                 border:1px solid ${BRAND.BORDER};
                 border-top:none;
                 border-radius:0 0 ${BRAND.RADIUS}px ${BRAND.RADIUS}px;
-                padding:14px 16px 18px 16px;
+                padding:12px 16px 16px 16px;
                 text-align:center;
               ">
                 <div style="font:500 12px/1.6 Arial, Helvetica, sans-serif;color:${BRAND.SUBTLE};">
@@ -218,16 +206,16 @@ const base = ({ title, bodyHTML = "" }) => `
 </html>
 `;
 
-/* ---------- items table (SKU - Product - Boxes - Status) ---------- */
+/* ---------- items table ---------- */
 function orderItemsTable(items = []) {
   const safeItems = Array.isArray(items) ? items : [];
 
   const header = `
     <tr>
-      <th style="padding:12px;border:1px solid ${BRAND.BORDER};background:#F7F7F7;text-align:left;font:900 12px/1.2 Arial, Helvetica, sans-serif;letter-spacing:.06em;text-transform:uppercase;">SKU / REF No.</th>
-      <th style="padding:12px;border:1px solid ${BRAND.BORDER};background:#F7F7F7;text-align:left;font:900 12px/1.2 Arial, Helvetica, sans-serif;letter-spacing:.06em;text-transform:uppercase;">Product</th>
-      <th style="padding:12px;border:1px solid ${BRAND.BORDER};background:#F7F7F7;text-align:center;font:900 12px/1.2 Arial, Helvetica, sans-serif;letter-spacing:.06em;text-transform:uppercase;">Boxes</th>
-      <th style="padding:12px;border:1px solid ${BRAND.BORDER};background:#F7F7F7;text-align:center;font:900 12px/1.2 Arial, Helvetica, sans-serif;letter-spacing:.06em;text-transform:uppercase;">Status</th>
+      <th style="padding:10px;border:1px solid ${BRAND.BORDER};background:#F7F7F7;text-align:left;font:900 12px/1.2 Arial, Helvetica, sans-serif;letter-spacing:.06em;text-transform:uppercase;">SKU / REF</th>
+      <th style="padding:10px;border:1px solid ${BRAND.BORDER};background:#F7F7F7;text-align:left;font:900 12px/1.2 Arial, Helvetica, sans-serif;letter-spacing:.06em;text-transform:uppercase;">Product</th>
+      <th style="padding:10px;border:1px solid ${BRAND.BORDER};background:#F7F7F7;text-align:center;font:900 12px/1.2 Arial, Helvetica, sans-serif;letter-spacing:.06em;text-transform:uppercase;">Boxes</th>
+      <th style="padding:10px;border:1px solid ${BRAND.BORDER};background:#F7F7F7;text-align:center;font:900 12px/1.2 Arial, Helvetica, sans-serif;letter-spacing:.06em;text-transform:uppercase;">Status</th>
     </tr>
   `;
 
@@ -238,15 +226,26 @@ function orderItemsTable(items = []) {
       const title = clean(it.title) || "-";
       const barcode = clean(it.barcode);
 
-      const soldOut = it.available === false;
-      const statusText = soldOut ? "Back order" : "In Stock";
+      const qtyBoxes =
+        n(it.qtyBoxes, NaN) ||
+        n(it.boxes, NaN) ||
+        n(it.qty, NaN) ||
+        n(it.quantity, 0);
+
+      const soldOut =
+        it.available === false ||
+        it.soldOut === true ||
+        String(it.status || "").toLowerCase() === "backorder" ||
+        String(it.status || "").toLowerCase() === "back order";
+
+      const statusText = soldOut ? "Back order" : "In stock";
       const zebra = idx % 2 === 0 ? "#FFFFFF" : "#FCFCFD";
 
       return `
         <tr>
-          <td style="padding:12px;border:1px solid ${BRAND.BORDER};vertical-align:top;background:${zebra};">
-            <div style="font:900 14px/1.35 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};">
-              SKU: ${esc(sku)}
+          <td style="padding:10px;border:1px solid ${BRAND.BORDER};vertical-align:top;background:${zebra};">
+            <div style="font:900 13px/1.35 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};">
+              ${esc(sku)}
             </div>
             ${
               ref && ref !== sku
@@ -255,8 +254,8 @@ function orderItemsTable(items = []) {
             }
           </td>
 
-          <td style="padding:12px;border:1px solid ${BRAND.BORDER};vertical-align:top;background:${zebra};">
-            <div style="font:900 14px/1.35 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};">
+          <td style="padding:10px;border:1px solid ${BRAND.BORDER};vertical-align:top;background:${zebra};">
+            <div style="font:900 13px/1.35 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};">
               ${esc(title)}
             </div>
             ${
@@ -266,11 +265,11 @@ function orderItemsTable(items = []) {
             }
           </td>
 
-          <td style="padding:12px;border:1px solid ${BRAND.BORDER};text-align:center;font:900 14px/1.35 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};background:${zebra};">
-            ${esc(String(n(it.qtyBoxes, 0)))}
+          <td style="padding:10px;border:1px solid ${BRAND.BORDER};text-align:center;font:900 13px/1.35 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};background:${zebra};">
+            ${esc(String(qtyBoxes))}
           </td>
 
-          <td style="padding:12px;border:1px solid ${BRAND.BORDER};text-align:center;background:${zebra};">
+          <td style="padding:10px;border:1px solid ${BRAND.BORDER};text-align:center;background:${zebra};">
             ${soldOut ? pill(statusText, "bad") : pill(statusText, "ok")}
           </td>
         </tr>
@@ -280,10 +279,16 @@ function orderItemsTable(items = []) {
 
   const empty = `
     <tr>
-      <td colspan="4" style="padding:14px;border:1px solid ${BRAND.BORDER};color:${BRAND.SUBTLE};font:400 14px/1.6 Arial, Helvetica, sans-serif;text-align:center;">
+      <td colspan="4" style="padding:12px;border:1px solid ${BRAND.BORDER};color:${BRAND.SUBTLE};font:400 13px/1.6 Arial, Helvetica, sans-serif;text-align:center;">
         No items found.
       </td>
     </tr>
+  `;
+
+  const footnote = `
+    <div style="margin-top:10px;font:400 12px/1.6 Arial, Helvetica, sans-serif;color:${BRAND.SUBTLE};">
+      Items marked as <b>Back order</b> are currently unavailable and will be supplied when stock is available.
+    </div>
   `;
 
   return `
@@ -291,12 +296,24 @@ function orderItemsTable(items = []) {
       ${header}
       ${rowsHTML || empty}
     </table>
+    ${footnote}
   `;
 }
 
-/* ---------- Extra notes block (packing instructions) ---------- */
-function extraNotesBlock(data = {}) {
-  const notes =
+/* ---------- layout builder (single-column only) ---------- */
+function buildOrderEmailLayout(data = {}) {
+  const c = data.customer || {};
+  const items = Array.isArray(data.items) ? data.items : [];
+
+  const shippingText = fmtAddress(
+    data.shippingAddress ||
+      c.shippingAddress ||
+      c.shipping_address ||
+      data.shipping_address ||
+      ""
+  );
+
+  const extra =
     clean(data.extraNotes) ||
     clean(data.notes) ||
     clean(data.customerNotes) ||
@@ -304,59 +321,12 @@ function extraNotesBlock(data = {}) {
     clean(data.extraNote) ||
     "";
 
-  return `
-    ${blockTitle("Extra notes")}
-    ${blockSub("Extra notes (optional) — e.g. packing instructions")}
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
-      <tr>
-        <td style="
-          border:1px solid ${BRAND.BORDER};
-          background:#FAFAFA;
-          border-radius:14px;
-          padding:12px 14px;
-          font:400 13px/1.65 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-          color:${BRAND.TEXT};
-        ">
-          ${
-            notes
-              ? escWithBreaks(String(notes))
-              : `<span style="color:${BRAND.SUBTLE};">-</span>`
-          }
-        </td>
-      </tr>
-    </table>
-  `;
-}
-
-/* ---------- shared layout builder (SINGLE COLUMN) ---------- */
-function buildOrderEmailLayout(data = {}) {
-  const c = data.customer || {};
-  const items = Array.isArray(data.items) ? data.items : [];
-
-  const ship =
-    data.shippingAddress ||
-    c.shippingAddress ||
-    c.shipping_address ||
-    data.shipping_address ||
-    "";
-
-  const shippingText = fmtAddress(ship);
-
-  const orderSummary = `
-    ${blockTitle("Your Order")}
-    ${blockSub("Review your wholesale order summary below.")}
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
-      ${row("Order ID", data.orderId)}
-      ${row("Customer Number", c.customerNumber)}
-      ${row("ABN", c.abn)}
-    </table>
-  `;
-
-  const notesHTML = extraNotesBlock(data);
-
+  // 1) Customer Information (includes order id + customer number + ABN)
   const customerInfo = `
     ${blockTitle("Customer Information")}
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
+      ${row("Order ID", data.orderId)}
+      ${row("Customer Number", c.customerNumber)}
       ${row("Customer name", c.name)}
       ${row("Customer email", c.email)}
       ${row("Customer phone", c.phone)}
@@ -364,31 +334,41 @@ function buildOrderEmailLayout(data = {}) {
     </table>
   `;
 
+  // 2) Shipping Address
   const shippingInfo = `
     ${blockTitle("Shipping Address")}
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
-      ${row("Customer shipping address", shippingText || "-", { multiline: true })}
+      ${row("Address", shippingText || "-", { multiline: true })}
     </table>
   `;
 
+  // 3) Items
   const itemsBlock = `
     ${blockTitle("Items")}
     ${orderItemsTable(items)}
-    <div style="margin-top:10px;font:400 12px/1.6 Arial, Helvetica, sans-serif;color:${BRAND.SUBTLE};">
-      Items marked as <b>Back order</b> are currently unavailable and will be supplied when stock is available.
-    </div>
   `;
 
-  // ✅ Single column order: Customer → Shipping → Items
+  // Optional: Extra notes (only if exists to keep email short)
+  const notesBlock = extra
+    ? `
+      ${blockTitle("Extra notes")}
+      <div style="
+        border:1px solid ${BRAND.BORDER};
+        background:#FAFAFA;
+        border-radius:14px;
+        padding:12px 14px;
+        font:400 13px/1.65 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+        color:${BRAND.TEXT};
+      ">${escWithBreaks(extra)}</div>
+    `
+    : "";
+
   return `
-    ${card(orderSummary)}
-    ${spacer(14)}
-    ${card(notesHTML)}
-    ${spacer(14)}
     ${card(customerInfo)}
-    ${spacer(14)}
+    ${spacer(12)}
     ${card(shippingInfo)}
-    ${spacer(14)}
+    ${notesBlock ? spacer(12) + card(notesBlock) : ""}
+    ${spacer(12)}
     ${card(itemsBlock)}
   `;
 }
