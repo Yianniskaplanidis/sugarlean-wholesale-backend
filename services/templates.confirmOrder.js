@@ -3,6 +3,10 @@
 //   data.customer = { name, email, phone, customerNumber, abn }
 //   data.shippingAddress = object OR string
 //   data.extraNotes = textarea value
+//   data.items = [{ sku/ref/title/barcode/qtyBoxes/boxes/qty/quantity/available/soldOut/status }...]
+// Optional:
+//   data.orderId
+//   data.submittedAt / data.submitted / data.createdAt (date/time string or timestamp)
 
 const { BRAND, SITE_URL, LOGO_URL } = require("./templates");
 
@@ -21,6 +25,19 @@ const clean = (v) => (v == null ? "" : String(v)).trim();
 const n = (v, fallback = 0) => {
   const num = Number(v);
   return Number.isFinite(num) ? num : fallback;
+};
+
+const fmtDateTime = (v) => {
+  const raw = clean(v);
+  if (!raw) return "";
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return raw;
+  try {
+    // Keep it simple + readable. (Server timezone may vary; raw fallback above.)
+    return d.toLocaleString("en-AU");
+  } catch (e) {
+    return d.toISOString();
+  }
 };
 
 const pill = (text, tone = "ok") => {
@@ -301,7 +318,7 @@ function orderItemsTable(items = []) {
 }
 
 /* ---------- layout builder (single-column only) ---------- */
-function buildOrderEmailLayout(data = {}) {
+function buildOrderEmailLayout(data = {}, audience = "user") {
   const c = data.customer || {};
   const items = Array.isArray(data.items) ? data.items : [];
 
@@ -321,11 +338,46 @@ function buildOrderEmailLayout(data = {}) {
     clean(data.extraNote) ||
     "";
 
-  // 1) Customer Information (includes order id + customer number + ABN)
+  const submitted =
+    fmtDateTime(data.submittedAt) ||
+    fmtDateTime(data.submitted) ||
+    fmtDateTime(data.createdAt) ||
+    "";
+
+  /* ---------- audience intro blocks ---------- */
+  const adminIntroBlock = `
+    ${blockTitle("New Wholesale Order Submitted")}
+    <div style="font:400 13px/1.7 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};">
+      A new wholesale order has been submitted via the Sugarlean Wholesale Portal.<br>
+      Please review the customer details, shipping address, and items below.<br>
+      Items marked <b>Back order</b> were unavailable at the time of submission and will need stock allocation / follow-up.
+      <div style="margin-top:10px;color:${BRAND.SUBTLE};font:400 12px/1.6 Arial, Helvetica, sans-serif;">
+        Tip: When contacting the customer, quote the <b>Order ID</b> and <b>Customer Number</b>.
+      </div>
+    </div>
+  `;
+
+  const userIntroBlock = `
+    ${blockTitle("We’ve received your wholesale order")}
+    <div style="font:400 13px/1.7 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};">
+      Hi <b>${esc(c.name || "there")}</b>,<br>
+      Thanks for your order — it has been received successfully.<br>
+      Our team will now review and process it.
+      <div style="margin-top:10px;color:${BRAND.SUBTLE};font:400 12px/1.6 Arial, Helvetica, sans-serif;">
+        Items marked <b>Back order</b> will be supplied when stock becomes available.<br>
+        For changes or questions, please email <b>wholesale@sugarlean.com.au</b> and include your <b>Order ID</b>.
+      </div>
+    </div>
+  `;
+
+  const introCard = audience === "admin" ? card(adminIntroBlock) : card(userIntroBlock);
+
+  // 1) Customer Information (includes order id + submitted + customer number + ABN)
   const customerInfo = `
     ${blockTitle("Customer Information")}
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
       ${row("Order ID", data.orderId)}
+      ${submitted ? row("Submitted", submitted) : ""}
       ${row("Customer Number", c.customerNumber)}
       ${row("Customer name", c.name)}
       ${row("Customer email", c.email)}
@@ -364,6 +416,8 @@ function buildOrderEmailLayout(data = {}) {
     : "";
 
   return `
+    ${introCard}
+    ${spacer(12)}
     ${card(customerInfo)}
     ${spacer(12)}
     ${card(shippingInfo)}
@@ -376,13 +430,13 @@ function buildOrderEmailLayout(data = {}) {
 /* ---------- templates ---------- */
 function confirmOrderAdminTemplate(data = {}) {
   const title = "Wholesale Order Summary";
-  const bodyHTML = buildOrderEmailLayout(data);
+  const bodyHTML = buildOrderEmailLayout(data, "admin");
   return base({ title, bodyHTML });
 }
 
 function confirmOrderUserTemplate(data = {}) {
   const title = "Wholesale Order Summary";
-  const bodyHTML = buildOrderEmailLayout(data);
+  const bodyHTML = buildOrderEmailLayout(data, "user");
   return base({ title, bodyHTML });
 }
 
