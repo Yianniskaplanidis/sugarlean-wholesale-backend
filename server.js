@@ -1,4 +1,3 @@
-// server.js
 require("dotenv").config();
 
 const express = require("express");
@@ -18,7 +17,6 @@ app.set("trust proxy", true);
  * -------------------------------------------*/
 app.use(
   helmet({
-    // allow loading assets across origins (e.g., CDN images in emails)
     crossOriginResourcePolicy: { policy: "cross-origin" },
   })
 );
@@ -29,11 +27,10 @@ app.use(
 const DEFAULT_ORIGINS = [
   "https://www.sugarlean.com.au",
   "https://sugarlean.com.au",
-  "https://sugarlean.myshopify.com", // Shopify preview/editor
-  "http://localhost:3000", // local FE
+  "https://sugarlean.myshopify.com",
+  "http://localhost:3000",
 ];
 
-// Accept either CORS_ORIGINS or CORS_ORIGIN (comma-separated)
 const corsEnv = process.env.CORS_ORIGINS || process.env.CORS_ORIGIN || "";
 
 const extraOrigin = corsEnv
@@ -52,7 +49,6 @@ app.use(
   })
 );
 
-// quick response for preflights
 app.options("*", cors());
 
 /* ---------------------------------------------
@@ -68,9 +64,6 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 
 /* ---------------------------------------------
  * Optional: Base path for Shopify App Proxy later
- * If you ever set an App Proxy like /apps/wholesale,
- * you can set SHOPIFY_APP_PROXY_PREFIX=/apps/wholesale
- * and keep the same handlers.
  * -------------------------------------------*/
 const APP_PROXY_PREFIX = (process.env.SHOPIFY_APP_PROXY_PREFIX || "").trim();
 
@@ -81,7 +74,7 @@ const APP_PROXY_PREFIX = (process.env.SHOPIFY_APP_PROXY_PREFIX || "").trim();
 const REQUIRED_WS_TOKEN = (process.env.WS_SHARED_TOKEN || "").trim();
 
 function optionalTokenGuard(req, res, next) {
-  if (!REQUIRED_WS_TOKEN) return next(); // no token configured → allow
+  if (!REQUIRED_WS_TOKEN) return next();
   const sent = (req.get("x-ws-token") || req.get("X-WS-Token") || "").trim();
   if (sent === REQUIRED_WS_TOKEN) return next();
   return res.status(401).json({ ok: false, error: "unauthorized" });
@@ -91,21 +84,25 @@ function optionalTokenGuard(req, res, next) {
  * Routes mounting helper (supports optional prefix)
  * -------------------------------------------*/
 function mountWholesaleRoutes(basePath) {
-  // Public ping endpoint (useful from Shopify confirm page / quick browser test)
+  // ✅ Public ping endpoints (NO token required)
   app.get(`${basePath}/ping`, (_req, res) => {
-    res.json({ ok: true, ts: Date.now() });
+    res.json({ ok: true, route: "wholesale", ts: Date.now() });
   });
 
-  // Token guard applies to API routes (but ping stays public)
+  app.get(`${basePath}/confirm-order/ping`, (_req, res) => {
+    res.json({ ok: true, route: "confirm-order", ts: Date.now() });
+  });
+
+  // ✅ Everything else under basePath requires token (if WS_SHARED_TOKEN is set)
   app.use(basePath, optionalTokenGuard);
 
-  // Main wholesale routes (apply)
+  // Main wholesale routes (includes confirm-order because routes/wholesale.js uses router.use("./confirmOrder"))
   app.use(basePath, require("./routes/wholesale"));
 
-  // ✅ Confirm order routes
-  app.use(basePath, require("./routes/confirmOrder"));
+  // ❌ IMPORTANT: remove duplicate mount (confirmOrder is already mounted inside routes/wholesale.js)
+  // app.use(basePath, require("./routes/confirmOrder"));
 
-  // Optional diagnostics (DNS/TCP/SMTP checks)
+  // Optional diagnostics
   try {
     app.use(basePath, require("./routes/diag"));
   } catch (e) {
@@ -115,14 +112,9 @@ function mountWholesaleRoutes(basePath) {
 
 /* ---------------------------------------------
  * Mount routes
- * - Normal API: /api/wholesale
- * - Optional Shopify App Proxy prefix (if configured)
  * -------------------------------------------*/
 mountWholesaleRoutes("/api/wholesale");
 
-// If you configure an App Proxy later, your Shopify page can call:
-// https://www.sugarlean.com.au/apps/wholesale/confirm-order
-// (and you can remove CORS requirement for that path)
 if (APP_PROXY_PREFIX) {
   mountWholesaleRoutes(APP_PROXY_PREFIX);
 }
@@ -131,11 +123,7 @@ if (APP_PROXY_PREFIX) {
  * 404 + error handler
  * -------------------------------------------*/
 app.use((req, res) => {
-  res.status(404).json({
-    ok: false,
-    error: "Not Found",
-    path: req.originalUrl,
-  });
+  res.status(404).json({ ok: false, error: "Not Found", path: req.originalUrl });
 });
 
 app.use((err, _req, res, _next) => {
@@ -144,8 +132,7 @@ app.use((err, _req, res, _next) => {
 });
 
 /* ---------------------------------------------
- * Optional: verify transport on boot (SMTP or Graph),
- * depending on how services/mailer.js is implemented.
+ * Optional: verify transport on boot
  * -------------------------------------------*/
 (async () => {
   try {
@@ -160,7 +147,7 @@ app.use((err, _req, res, _next) => {
 })();
 
 /* ---------------------------------------------
- * Process guards (don’t crash silently)
+ * Process guards
  * -------------------------------------------*/
 process.on("unhandledRejection", (reason) => {
   console.error("Unhandled Rejection:", reason);
@@ -170,7 +157,7 @@ process.on("uncaughtException", (err) => {
 });
 
 /* ---------------------------------------------
- * Start server (Render-friendly)
+ * Start server
  * -------------------------------------------*/
 const PORT = process.env.PORT || 4000;
 
