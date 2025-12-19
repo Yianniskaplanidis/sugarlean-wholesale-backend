@@ -168,6 +168,19 @@ function buildConfirmOrderPayload(reqBody, req) {
     80
   );
 
+  // ✅ NEW: Company name (from customer OR top-level OR shippingAddress)
+  const customerCompany = clampStr(
+    customerObj.company ||
+      customerObj.companyName ||
+      customerObj.company_name ||
+      b.company ||
+      b.companyName ||
+      b.company_name ||
+      (shippingAddress && typeof shippingAddress === "object" ? shippingAddress.company : "") ||
+      "",
+    200
+  );
+
   return {
     shop: clampStr(b.shop || b.shopDomain || b.domain, 120),
     orderId: clampStr(b.orderId || b.order_id || b.orderNumber || b.order_number, 80),
@@ -175,7 +188,7 @@ function buildConfirmOrderPayload(reqBody, req) {
     // keep your existing combined note/body too (if you still want it)
     note: clampStr(b.note || b.message || b.notes, 4000),
 
-    // ✅ NEW: fields used by templates.confirmOrder.js
+    // ✅ fields used by templates.confirmOrder.js
     extraNotes,
     shippingAddress,
 
@@ -191,6 +204,9 @@ function buildConfirmOrderPayload(reqBody, req) {
         80
       ),
       abn: customerAbn,
+
+      // ✅ NEW: company available to email template
+      company: customerCompany,
     },
 
     items,
@@ -260,6 +276,7 @@ router.post("/confirm-order", async (req, res) => {
         toAdmin: !!info?.admin,
         toUser: !!info?.user,
         customer: data.customer?.email || data.customer?.customerNumber,
+        company: data.customer?.company || "",
         items: data.items?.length || 0,
         hasShipping: !!data.shippingAddress,
         hasExtraNotes: !!t(data.extraNotes),
