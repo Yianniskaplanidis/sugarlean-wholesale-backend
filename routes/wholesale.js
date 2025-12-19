@@ -2,7 +2,7 @@
 const express = require("express");
 const router = express.Router();
 
-const { sendWholesaleEmails } = require("../services/mailer");
+const { sendWholesaleEmails } = require("../services/mailer"); // ✅ correct path
 
 /* ----------------------------- helpers ----------------------------- */
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
@@ -84,7 +84,7 @@ router.post("/apply-sync", async (req, res) => {
   }
 });
 
-// ✅ confirm-order routes mounted here (they will be protected by server.js token guard)
+// ✅ confirm-order routes mounted here (routes/confirmOrder.js)
 router.use("/", require("./confirmOrder"));
 
 module.exports = router;

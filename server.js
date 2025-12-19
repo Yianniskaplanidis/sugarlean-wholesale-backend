@@ -1,91 +1,53 @@
-// routes/wholesale.js
+// server.js
+require("dotenv").config();
+
 const express = require("express");
-const router = express.Router();
+const cors = require("cors");
+const helmet = require("helmet");
+const morgan = require("morgan");
 
-const { sendWholesaleEmails } = require("./services/mailer");
+const app = express();
 
+/* ----------------------------- core middleware ----------------------------- */
+app.set("trust proxy", 1);
 
-/* ----------------------------- helpers ----------------------------- */
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
-const t = (v) => (v == null ? "" : String(v).trim());
+app.use(
+  cors({
+    origin: true, // allow requests from anywhere (Shopify, Postman, browser)
+    credentials: false,
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-ws-token"],
+  })
+);
 
-const toBool = (v) => {
-  if (typeof v === "boolean") return v;
-  if (v == null) return false;
-  const s = String(v).trim().toLowerCase();
-  return s === "true" || s === "1" || s === "on" || s === "yes";
-};
+app.use(helmet());
+app.use(express.json({ limit: "2mb" }));
+app.use(express.urlencoded({ extended: true }));
+app.use(morgan("combined"));
 
-function buildPayload(reqBody, req) {
-  const b = reqBody || {};
-  return {
-    companyName: t(b.companyName) || t(b.businessName) || t(b.company) || t(b.business_name),
-    contactName: t(b.contactName) || t(b.contact) || t(b.name) || t(b.contact_name),
-    phone: t(b.phone) || t(b.phoneNumber) || t(b.contact_number) || t(b.mobile),
-    abn: t(b.abn) || t(b.taxId) || t(b.tax_id),
-    email: t(b.email) || t(b.contact_email),
-    streetAddress: t(b.streetAddress) || t(b.street) || t(b.address) || t(b.street_address),
-    city: t(b.city) || t(b.town),
-    state: t(b.state) || t(b.region) || t(b.province),
-    postcode: t(b.postcode) || t(b.postCode) || t(b.post_code) || t(b.zip),
-    country: t(b.country),
-    note: t(b.note) || t(b.message) || t(b.notes),
-    marketingOptIn: toBool(b.marketingOptIn || b.acceptsMarketing || b.accepts_marketing || b.consentMarketing),
-    policyAccepted: toBool(b.policyAccepted || b.termsAccepted || b.terms_accepted || b.acceptPolicy),
-    ip: req.headers["x-forwarded-for"] || req.socket.remoteAddress || "",
-    ua: req.headers["user-agent"] || "",
-  };
-}
+/* ----------------------------- basic routes ----------------------------- */
+app.get("/", (_req, res) => res.json({ ok: true, service: "sugarlean-wholesale-backend" }));
+app.get("/healthz", (_req, res) => res.json({ ok: true }));
 
-function validatePayload(data) {
-  const missing = [];
-  ["companyName","contactName","phone","abn","email","streetAddress","city","state","postcode","country"].forEach((k) => {
-    if (!data[k]) missing.push(k);
-  });
+/* ----------------------------- API routes ----------------------------- */
+/**
+ * IMPORTANT:
+ * - routes/wholesale.js is inside /routes
+ * - wholesale.js itself does: router.use("/", require("./confirmOrder"))
+ *   so confirm order routes will work under /api/wholesale/...
+ */
+app.use("/api/wholesale", require("./routes/wholesale"));
 
-  if (missing.length) return { ok: false, status: 422, error: "Missing fields", missing };
-  if (!EMAIL_RE.test(data.email)) return { ok: false, status: 422, error: "Invalid email format" };
-  if (!data.policyAccepted) return { ok: false, status: 422, error: "You must accept the policy to submit." };
-  return { ok: true };
-}
+/**
+ * If you have routes/diag.js (as per your screenshot),
+ * mount it here so it becomes:
+ *   GET /api/wholesale/diag
+ */
+app.use("/api/wholesale", require("./routes/diag"));
 
-/* ------------------------------ routes ------------------------------ */
-router.get("/ping", (_req, res) => res.json({ ok: true, route: "wholesale" }));
+/* ----------------------------- start server ----------------------------- */
+const PORT = Number(process.env.PORT || 3000);
 
-router.post("/apply", async (req, res) => {
-  if (t(req.body?.website)) return res.status(202).json({ ok: true, message: "Received." });
-
-  const data = buildPayload(req.body, req);
-  const v = validatePayload(data);
-  if (!v.ok) return res.status(v.status).json(v);
-
-  res.status(202).json({ ok: true, message: "Application received. Email will follow shortly." });
-
-  setImmediate(async () => {
-    try {
-      const info = await sendWholesaleEmails(data);
-      console.log("✅ Wholesale /apply emails sent", { toAdmin: !!info?.admin, toUser: !!info?.user, user: data.email });
-    } catch (err) {
-      console.error("💥 /apply email send failed (background):", err?.message || err);
-    }
-  });
+app.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`);
 });
-
-router.post("/apply-sync", async (req, res) => {
-  const data = buildPayload(req.body, req);
-  const v = validatePayload(data);
-  if (!v.ok) return res.status(v.status).json(v);
-
-  try {
-    const info = await sendWholesaleEmails(data);
-    return res.json({ ok: true, sent: { admin: !!info?.admin, user: !!info?.user } });
-  } catch (e) {
-    console.error("apply-sync failed:", e);
-    return res.status(502).json({ ok: false, error: "Email send failed", reason: e?.message || String(e) });
-  }
-});
-
-// confirm-order routes mounted here
-router.use("/", require("./confirmOrder"));
-
-module.exports = router;
