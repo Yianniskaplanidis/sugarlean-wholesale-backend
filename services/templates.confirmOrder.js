@@ -59,32 +59,6 @@ const pill = (text, tone = "ok") => {
   `;
 };
 
-const row = (label, value, { multiline = false } = {}) => {
-  const v = clean(value) === "" ? "-" : String(value);
-  const cell = multiline ? escWithBreaks(v) : esc(v);
-
-  return `
-    <tr>
-      <td style="
-        width:170px;
-        padding:10px 12px;
-        border:1px solid ${BRAND.BORDER};
-        background:#F7F7F7;
-        font:900 12px/1.35 Arial, Helvetica, sans-serif;
-        color:${BRAND.TEXT};
-        vertical-align:top;
-      ">${esc(label)}</td>
-      <td style="
-        padding:10px 12px;
-        border:1px solid ${BRAND.BORDER};
-        font:400 13px/1.6 Arial, Helvetica, sans-serif;
-        color:${BRAND.TEXT};
-        vertical-align:top;
-      ">${cell}</td>
-    </tr>
-  `;
-};
-
 const card = (innerHTML) => `
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="
     border:1px solid ${BRAND.BORDER};
@@ -111,7 +85,6 @@ const blockTitle = (label) => `
 
 const fmtAddress = (addr) => {
   if (!addr) return "";
-
   if (typeof addr === "string") return addr;
 
   const parts = [
@@ -127,6 +100,52 @@ const fmtAddress = (addr) => {
     .filter(Boolean);
 
   return parts.join("\n");
+};
+
+/* ---------- SIMPLE INFO GRID (less lines) ---------- */
+const infoGrid = (rows = []) => {
+  const safe = Array.isArray(rows) ? rows : [];
+
+  const items = safe
+    .filter((r) => r && clean(r.label))
+    .map((r, idx) => {
+      const label = esc(r.label);
+      const valueRaw = clean(r.value);
+      const value =
+        valueRaw === ""
+          ? "-"
+          : r.multiline
+          ? escWithBreaks(valueRaw)
+          : esc(valueRaw);
+
+      const showDivider = idx !== safe.length - 1;
+
+      return `
+        <tr>
+          <td style="padding:10px 0; vertical-align:top;">
+            <div style="
+              font:900 12px/1.2 Arial, Helvetica, sans-serif;
+              letter-spacing:.06em;
+              text-transform:uppercase;
+              color:${BRAND.SUBTLE};
+              margin-bottom:5px;
+            ">${label}</div>
+            <div style="
+              font:500 14px/1.55 Arial, Helvetica, sans-serif;
+              color:${BRAND.TEXT};
+            ">${value}</div>
+            ${showDivider ? `<div style="margin-top:10px;border-top:1px solid ${BRAND.BORDER};"></div>` : ""}
+          </td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  return `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+      ${items}
+    </table>
+  `;
 };
 
 /* ---------- base wrapper (Sugarlean style) ---------- */
@@ -222,16 +241,16 @@ const base = ({ title, bodyHTML = "" }) => `
 </html>
 `;
 
-/* ---------- items table ---------- */
+/* ---------- items table (SIMPLER: less lines) ---------- */
 function orderItemsTable(items = []) {
   const safeItems = Array.isArray(items) ? items : [];
 
   const header = `
     <tr>
-      <th style="padding:10px;border:1px solid ${BRAND.BORDER};background:#F7F7F7;text-align:left;font:900 12px/1.2 Arial, Helvetica, sans-serif;letter-spacing:.06em;text-transform:uppercase;">SKU / REF</th>
-      <th style="padding:10px;border:1px solid ${BRAND.BORDER};background:#F7F7F7;text-align:left;font:900 12px/1.2 Arial, Helvetica, sans-serif;letter-spacing:.06em;text-transform:uppercase;">Product</th>
-      <th style="padding:10px;border:1px solid ${BRAND.BORDER};background:#F7F7F7;text-align:center;font:900 12px/1.2 Arial, Helvetica, sans-serif;letter-spacing:.06em;text-transform:uppercase;">Boxes</th>
-      <th style="padding:10px;border:1px solid ${BRAND.BORDER};background:#F7F7F7;text-align:center;font:900 12px/1.2 Arial, Helvetica, sans-serif;letter-spacing:.06em;text-transform:uppercase;">Status</th>
+      <th style="padding:10px 10px 8px;border-bottom:1px solid ${BRAND.BORDER};background:#F7F7F7;text-align:left;font:900 12px/1.2 Arial, Helvetica, sans-serif;letter-spacing:.06em;text-transform:uppercase;">SKU / REF</th>
+      <th style="padding:10px 10px 8px;border-bottom:1px solid ${BRAND.BORDER};background:#F7F7F7;text-align:left;font:900 12px/1.2 Arial, Helvetica, sans-serif;letter-spacing:.06em;text-transform:uppercase;">Product</th>
+      <th style="padding:10px 10px 8px;border-bottom:1px solid ${BRAND.BORDER};background:#F7F7F7;text-align:center;font:900 12px/1.2 Arial, Helvetica, sans-serif;letter-spacing:.06em;text-transform:uppercase;">Boxes</th>
+      <th style="padding:10px 10px 8px;border-bottom:1px solid ${BRAND.BORDER};background:#F7F7F7;text-align:center;font:900 12px/1.2 Arial, Helvetica, sans-serif;letter-spacing:.06em;text-transform:uppercase;">Status</th>
     </tr>
   `;
 
@@ -256,10 +275,11 @@ function orderItemsTable(items = []) {
 
       const statusText = soldOut ? "Back order" : "In stock";
       const zebra = idx % 2 === 0 ? "#FFFFFF" : "#FCFCFD";
+      const borderBottom = "1px solid " + BRAND.BORDER;
 
       return `
         <tr>
-          <td style="padding:10px;border:1px solid ${BRAND.BORDER};vertical-align:top;background:${zebra};">
+          <td style="padding:10px;vertical-align:top;background:${zebra};border-bottom:${borderBottom};">
             <div style="font:900 13px/1.35 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};">
               ${esc(sku)}
             </div>
@@ -270,7 +290,7 @@ function orderItemsTable(items = []) {
             }
           </td>
 
-          <td style="padding:10px;border:1px solid ${BRAND.BORDER};vertical-align:top;background:${zebra};">
+          <td style="padding:10px;vertical-align:top;background:${zebra};border-bottom:${borderBottom};">
             <div style="font:900 13px/1.35 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};">
               ${esc(title)}
             </div>
@@ -281,11 +301,11 @@ function orderItemsTable(items = []) {
             }
           </td>
 
-          <td style="padding:10px;border:1px solid ${BRAND.BORDER};text-align:center;font:900 13px/1.35 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};background:${zebra};">
+          <td style="padding:10px;text-align:center;font:900 13px/1.35 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};background:${zebra};border-bottom:${borderBottom};">
             ${esc(String(qtyBoxes))}
           </td>
 
-          <td style="padding:10px;border:1px solid ${BRAND.BORDER};text-align:center;background:${zebra};">
+          <td style="padding:10px;text-align:center;background:${zebra};border-bottom:${borderBottom};">
             ${soldOut ? pill(statusText, "bad") : pill(statusText, "ok")}
           </td>
         </tr>
@@ -295,7 +315,7 @@ function orderItemsTable(items = []) {
 
   const empty = `
     <tr>
-      <td colspan="4" style="padding:12px;border:1px solid ${BRAND.BORDER};color:${BRAND.SUBTLE};font:400 13px/1.6 Arial, Helvetica, sans-serif;text-align:center;">
+      <td colspan="4" style="padding:12px;border-bottom:1px solid ${BRAND.BORDER};color:${BRAND.SUBTLE};font:400 13px/1.6 Arial, Helvetica, sans-serif;text-align:center;">
         No items found.
       </td>
     </tr>
@@ -316,12 +336,11 @@ function orderItemsTable(items = []) {
   `;
 }
 
-/* ---------- layout builder (single-column only) ---------- */
-function buildOrderEmailLayout(data = {}, audience = "user") {
+/* ---------- layout builder ---------- */
+function buildOrderEmailLayout(data = {}) {
   const c = data.customer || {};
   const items = Array.isArray(data.items) ? data.items : [];
 
-  // ✅ Try to keep an OBJECT version of shipping address for easy fallback fields (company, etc)
   const shippingObj =
     (data.shippingAddress && typeof data.shippingAddress === "object" ? data.shippingAddress : null) ||
     (c.shippingAddress && typeof c.shippingAddress === "object" ? c.shippingAddress : null) ||
@@ -329,7 +348,6 @@ function buildOrderEmailLayout(data = {}, audience = "user") {
     (data.shipping_address && typeof data.shipping_address === "object" ? data.shipping_address : null) ||
     null;
 
-  // ✅ Company: prefer customer.company, else fallback to shipping address company
   const companyVal =
     clean(c.company) ||
     clean(c.companyName) ||
@@ -359,53 +377,30 @@ function buildOrderEmailLayout(data = {}, audience = "user") {
     fmtDateTime(data.createdAt) ||
     "";
 
-  /* ---------- audience intro blocks ---------- */
-
-  const userIntroBlock = `
-    ${blockTitle("We’ve received your wholesale order")}
-    <div style="font:400 13px/1.7 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};">
-      Hi <b>${esc(c.name || "there")}</b>,<br>
-      Thanks for your order — it has been received successfully.<br>
-      Our team will now review and process it.
-      <div style="margin-top:10px;color:${BRAND.SUBTLE};font:400 12px/1.6 Arial, Helvetica, sans-serif;">
-        Items marked <b>Back order</b> will be supplied when stock becomes available.<br>
-        For changes or questions, please email <b>wholesale@sugarlean.com.au</b> and include your <b>Order ID</b>.
-      </div>
-    </div>
-  `;
-
-  const introCard = audience === "admin" ? card(adminIntroBlock) : card(userIntroBlock);
-
-  // 1) Customer Information (includes order id + submitted + customer number + company + ABN)
   const customerInfo = `
     ${blockTitle("Customer Information")}
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
-      ${row("Order ID", data.orderId)}
-      ${submitted ? row("Submitted", submitted) : ""}
-      ${row("Customer Number", c.customerNumber)}
-      ${companyVal ? row("Company", companyVal) : ""}
-      ${row("Customer name", c.name)}
-      ${row("Customer email", c.email)}
-      ${row("Customer phone", c.phone)}
-      ${row("ABN", c.abn)}
-    </table>
+    ${infoGrid([
+      { label: "Order ID", value: data.orderId },
+      ...(submitted ? [{ label: "Submitted", value: submitted }] : []),
+      { label: "Customer Number", value: c.customerNumber },
+      { label: "Company", value: companyVal }, /* always show */
+      { label: "Customer name", value: c.name },
+      { label: "Customer email", value: c.email },
+      { label: "Customer phone", value: c.phone },
+      { label: "ABN", value: c.abn },
+    ])}
   `;
 
-  // 2) Shipping Address
   const shippingInfo = `
     ${blockTitle("Shipping Address")}
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
-      ${row("Address", shippingText || "-", { multiline: true })}
-    </table>
+    ${infoGrid([{ label: "Address", value: shippingText || "-", multiline: true }])}
   `;
 
-  // 3) Items
   const itemsBlock = `
     ${blockTitle("Items")}
     ${orderItemsTable(items)}
   `;
 
-  // Optional: Extra notes (only if exists to keep email short)
   const notesBlock = extra
     ? `
       ${blockTitle("Extra notes")}
@@ -421,8 +416,6 @@ function buildOrderEmailLayout(data = {}, audience = "user") {
     : "";
 
   return `
-    ${introCard}
-    ${spacer(12)}
     ${card(customerInfo)}
     ${spacer(12)}
     ${card(shippingInfo)}
@@ -435,13 +428,13 @@ function buildOrderEmailLayout(data = {}, audience = "user") {
 /* ---------- templates ---------- */
 function confirmOrderAdminTemplate(data = {}) {
   const title = "Wholesale Order Summary";
-  const bodyHTML = buildOrderEmailLayout(data, "admin");
+  const bodyHTML = buildOrderEmailLayout(data);
   return base({ title, bodyHTML });
 }
 
 function confirmOrderUserTemplate(data = {}) {
   const title = "Wholesale Order Summary";
-  const bodyHTML = buildOrderEmailLayout(data, "user");
+  const bodyHTML = buildOrderEmailLayout(data);
   return base({ title, bodyHTML });
 }
 

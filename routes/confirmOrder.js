@@ -28,9 +28,7 @@ function getUa(req) {
 function sanitizeAddress(addr) {
   if (!addr) return null;
 
-  // allow string address
   if (typeof addr === "string") return clampStr(addr, 1200);
-
   if (typeof addr !== "object") return null;
 
   const pick = (k, max = 200) => clampStr(addr[k], max);
@@ -104,11 +102,8 @@ function buildConfirmOrderPayload(reqBody, req) {
         "",
 
       sku: t(it.sku) || t(it.SKU) || t(it.variant_sku) || t(it.variantSku) || "",
-
       ref: t(it.ref) || t(it.ref_number) || t(it.refNumber) || "",
-
       barcode: t(it.barcode) || t(it.barcode_override) || t(it.barcodeOverride) || "",
-
       boxQty: t(it.boxQty) || t(it.box_quantity) || t(it.boxQuantity) || "",
 
       qtyBoxes: asNum(qtyBoxes, 0),
@@ -125,7 +120,6 @@ function buildConfirmOrderPayload(reqBody, req) {
     asNum(totalsObj.sub_total, NaN) ||
     items.reduce((sum, it) => sum + asNum(it.lineTotal, 0), 0);
 
-  // ✅ IMPORTANT: keep what your Shopify page posts (so email template gets real values)
   const shippingAddress = sanitizeAddress(
     b.shippingAddress ||
       b.shipping_address ||
@@ -168,7 +162,6 @@ function buildConfirmOrderPayload(reqBody, req) {
     80
   );
 
-  // ✅ NEW: Company name (from customer OR top-level OR shippingAddress)
   const customerCompany = clampStr(
     customerObj.company ||
       customerObj.companyName ||
@@ -185,10 +178,8 @@ function buildConfirmOrderPayload(reqBody, req) {
     shop: clampStr(b.shop || b.shopDomain || b.domain, 120),
     orderId: clampStr(b.orderId || b.order_id || b.orderNumber || b.order_number, 80),
 
-    // keep your existing combined note/body too (if you still want it)
     note: clampStr(b.note || b.message || b.notes, 4000),
 
-    // ✅ fields used by templates.confirmOrder.js
     extraNotes,
     shippingAddress,
 
@@ -204,8 +195,6 @@ function buildConfirmOrderPayload(reqBody, req) {
         80
       ),
       abn: customerAbn,
-
-      // ✅ NEW: company available to email template
       company: customerCompany,
     },
 
@@ -256,7 +245,6 @@ router.get("/confirm-order/ping", (_req, res) =>
  * Fast ACK (202) so Shopify never waits on SMTP.
  */
 router.post("/confirm-order", async (req, res) => {
-  // Honeypot (optional hidden field named "website")
   if (t(req.body?.website)) {
     return res.status(202).json({ ok: true, message: "Received." });
   }
@@ -265,10 +253,13 @@ router.post("/confirm-order", async (req, res) => {
   const v = validateConfirmOrderPayload(data);
   if (!v.ok) return res.status(v.status).json(v);
 
-  // return immediately
-  res.status(202).json({ ok: true, message: "Order received. Email will follow shortly." });
+  res.status(202).json({
+    ok: true,
+    queued: true,
+    orderId: data.orderId || null,
+    message: "Order received. Email will follow shortly.",
+  });
 
-  // send in background
   setImmediate(async () => {
     try {
       const info = await sendConfirmOrderEmails(data);
@@ -282,14 +273,14 @@ router.post("/confirm-order", async (req, res) => {
         hasExtraNotes: !!t(data.extraNotes),
       });
     } catch (err) {
-      console.error("💥 Confirm-order send failed (background):", err?.message || err);
+      console.error("💥 Confirm-order send failed (background):", err?.stack || err?.message || err);
     }
   });
 });
 
 /**
  * POST /api/wholesale/confirm-order-sync
- * Waits for SMTP/Graph. Use for Postman debugging.
+ * Waits for SMTP/Graph. Use for Postman/debugging.
  */
 router.post("/confirm-order-sync", async (req, res) => {
   const data = buildConfirmOrderPayload(req.body, req);
@@ -298,9 +289,13 @@ router.post("/confirm-order-sync", async (req, res) => {
 
   try {
     const info = await sendConfirmOrderEmails(data);
-    return res.json({ ok: true, sent: { admin: !!info?.admin, user: !!info?.user } });
+    return res.json({
+      ok: true,
+      orderId: data.orderId || null,
+      sent: { admin: !!info?.admin, user: !!info?.user },
+    });
   } catch (e) {
-    console.error("confirm-order-sync failed:", e);
+    console.error("confirm-order-sync failed:", e?.stack || e);
     return res.status(502).json({
       ok: false,
       error: "Email send failed",
