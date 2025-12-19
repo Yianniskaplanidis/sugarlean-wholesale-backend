@@ -95,12 +95,33 @@ function isEmail(v) {
   return EMAIL_RE.test(clean(v));
 }
 
+// ✅ supports: "Name <a@b.com>" or just "a@b.com"
+function extractEmail(s) {
+  const raw = clean(s);
+  if (!raw) return "";
+  const m = raw.match(/<([^>]+)>/);
+  return clean(m ? m[1] : raw);
+}
+
+// ✅ splits on comma, semicolon, or newline (most env formats)
 function splitEmailList(v) {
-  return clean(v)
-    .split(/[;,]/g)
+  const raw = clean(v);
+  if (!raw) return [];
+  return raw
+    .split(/[,\n;]+/g)
+    .map((s) => extractEmail(s))
     .map((s) => s.trim())
     .filter(Boolean)
     .filter((e) => isEmail(e));
+}
+
+// ✅ normalizes array/string into a clean email list
+function normalizeRecipients(to) {
+  if (Array.isArray(to)) {
+    // join then split so "a@b.com, c@d.com" inside array still works
+    return splitEmailList(to.join(","));
+  }
+  return splitEmailList(to || "");
 }
 
 // ---------- which transport? ----------
@@ -174,8 +195,7 @@ async function graphSend({ to, subject, html, replyTo }) {
   const sender = process.env.GRAPH_SENDER;
   if (!sender) throw new Error("GRAPH_SENDER not set.");
 
-  // support multi recipients
-  const recipients = Array.isArray(to) ? to : splitEmailList(to);
+  const recipients = normalizeRecipients(to);
   if (!recipients.length) throw new Error("No valid recipient(s) for Graph send.");
 
   const msg = {
@@ -214,11 +234,11 @@ async function sendMail({ to, subject, html, replyTo }) {
   if (MAIL_TRANSPORT === "graph") {
     return graphSend({ to, subject, html, replyTo });
   }
+
   const smtp = makeSmtpTransport();
   const from = BRAND_FROM || process.env.EMAIL_USER;
 
-  // support multi recipients for SMTP too
-  const toList = Array.isArray(to) ? to : splitEmailList(to);
+  const toList = normalizeRecipients(to);
   if (!toList.length) throw new Error("No valid recipient(s) for SMTP send.");
 
   return smtp.sendMail({
@@ -264,12 +284,12 @@ function esc(s) {
     .replace(/'/g, "&#039;");
 }
 
-/* NOTE: Fallbacks are ONLY used if confirm templates are missing.
-   If you still see old “New Wholesale Order Submitted …” text,
-   it means your real confirm template wasn’t loaded or exported correctly. */
+/* NOTE: Fallbacks are ONLY used if confirm templates are missing. */
 function buildConfirmAdminEmailFallback(data) {
   const c = data.customer || {};
-  const subject = `Wholesale Order Submission — ${c.customerNumber || "No Customer #"} — ${c.name || c.email || "Unknown"}`;
+  const subject = `Wholesale Order Submission — ${c.customerNumber || "No Customer #"} — ${
+    c.name || c.email || "Unknown"
+  }`;
 
   const html = `
     <div style="font-family:Arial,Helvetica,sans-serif;background:#f6f7fb;padding:24px;">
@@ -313,7 +333,7 @@ function buildConfirmUserEmailFallback(data) {
 
 async function sendWholesaleEmails(data) {
   const adminEmail = await tpl[adminTplName](data); // { subject, html }
-  const userEmail = await tpl[userTplName](data);   // { subject, html }
+  const userEmail = await tpl[userTplName](data); // { subject, html }
 
   const results = { admin: false, user: false };
 
@@ -344,8 +364,6 @@ async function sendWholesaleEmails(data) {
  * Confirm order email sending:
  * - Admin goes to CONFIRM_ORDER_TO (or WHOLESALE_TO or ADMIN_EMAIL as fallback)
  * - Customer ALWAYS receives a copy (to data.customer.email) if valid
- *
- * Prefers services/templates.confirmOrder.js; falls back only if missing.
  */
 async function sendConfirmOrderEmails(data) {
   const results = { admin: false, user: false };
@@ -387,16 +405,16 @@ async function sendConfirmOrderEmails(data) {
     process.env.WHOLESALE_TO ||
     process.env.ADMIN_EMAIL;
 
-  const adminList = Array.isArray(adminTo) ? adminTo : splitEmailList(adminTo || "");
+  const adminList = normalizeRecipients(adminTo);
   if (!adminList.length) {
     throw new Error(
-      "No admin recipient configured. Set CONFIRM_ORDER_TO or WHOLESALE_TO or ADMIN_EMAIL."
+      "No admin recipient configured. Set CONFIRM_ORDER_TO or WHOLESALE_TO or ADMIN_EMAIL (comma/semicolon/newline separated)."
     );
   }
 
   const customerEmail = clean(data?.customer?.email);
 
-  // Admin email: reply-to should be customer email if valid
+  // Admin email
   await sendMail({
     to: adminList,
     subject: adminEmail.subject,
@@ -411,9 +429,11 @@ async function sendConfirmOrderEmails(data) {
       to: customerEmail,
       subject: userEmail.subject,
       html: userEmail.html,
-      replyTo: "wholesale@sugarlean.com.au", // optional (feel free to change/remove)
+      replyTo: "wholesale@sugarlean.com.au",
     });
     results.user = true;
+  } else {
+    console.log("⚠️ Confirm-order: customer email missing/invalid, skip user email:", customerEmail);
   }
 
   return results;
