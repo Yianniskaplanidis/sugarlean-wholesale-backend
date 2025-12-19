@@ -1,7 +1,7 @@
 // services/templates.confirmOrder.js
 // Expects frontend to POST:
-//   data.customer = { name, email, phone, customerNumber, abn }
-//   data.shippingAddress = object OR string
+//   data.customer = { name, email, phone, customerNumber, abn, company? }
+//   data.shippingAddress = object OR string  (object may include .company)
 //   data.extraNotes = textarea value
 //   data.items = [{ sku/ref/title/barcode/qtyBoxes/boxes/qty/quantity/available/soldOut/status }...]
 // Optional:
@@ -33,7 +33,6 @@ const fmtDateTime = (v) => {
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return raw;
   try {
-    // Keep it simple + readable. (Server timezone may vary; raw fallback above.)
     return d.toLocaleString("en-AU");
   } catch (e) {
     return d.toISOString();
@@ -322,6 +321,22 @@ function buildOrderEmailLayout(data = {}, audience = "user") {
   const c = data.customer || {};
   const items = Array.isArray(data.items) ? data.items : [];
 
+  // ✅ Try to keep an OBJECT version of shipping address for easy fallback fields (company, etc)
+  const shippingObj =
+    (data.shippingAddress && typeof data.shippingAddress === "object" ? data.shippingAddress : null) ||
+    (c.shippingAddress && typeof c.shippingAddress === "object" ? c.shippingAddress : null) ||
+    (c.shipping_address && typeof c.shipping_address === "object" ? c.shipping_address : null) ||
+    (data.shipping_address && typeof data.shipping_address === "object" ? data.shipping_address : null) ||
+    null;
+
+  // ✅ Company: prefer customer.company, else fallback to shipping address company
+  const companyVal =
+    clean(c.company) ||
+    clean(c.companyName) ||
+    clean(c.company_name) ||
+    clean(shippingObj && shippingObj.company) ||
+    "";
+
   const shippingText = fmtAddress(
     data.shippingAddress ||
       c.shippingAddress ||
@@ -345,17 +360,6 @@ function buildOrderEmailLayout(data = {}, audience = "user") {
     "";
 
   /* ---------- audience intro blocks ---------- */
-  const adminIntroBlock = `
-    ${blockTitle("New Wholesale Order Submitted")}
-    <div style="font:400 13px/1.7 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};">
-      A new wholesale order has been submitted via the Sugarlean Wholesale Portal.<br>
-      Please review the customer details, shipping address, and items below.<br>
-      Items marked <b>Back order</b> were unavailable at the time of submission and will need stock allocation / follow-up.
-      <div style="margin-top:10px;color:${BRAND.SUBTLE};font:400 12px/1.6 Arial, Helvetica, sans-serif;">
-        Tip: When contacting the customer, quote the <b>Order ID</b> and <b>Customer Number</b>.
-      </div>
-    </div>
-  `;
 
   const userIntroBlock = `
     ${blockTitle("We’ve received your wholesale order")}
@@ -372,13 +376,14 @@ function buildOrderEmailLayout(data = {}, audience = "user") {
 
   const introCard = audience === "admin" ? card(adminIntroBlock) : card(userIntroBlock);
 
-  // 1) Customer Information (includes order id + submitted + customer number + ABN)
+  // 1) Customer Information (includes order id + submitted + customer number + company + ABN)
   const customerInfo = `
     ${blockTitle("Customer Information")}
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
       ${row("Order ID", data.orderId)}
       ${submitted ? row("Submitted", submitted) : ""}
       ${row("Customer Number", c.customerNumber)}
+      ${companyVal ? row("Company", companyVal) : ""}
       ${row("Customer name", c.name)}
       ${row("Customer email", c.email)}
       ${row("Customer phone", c.phone)}
