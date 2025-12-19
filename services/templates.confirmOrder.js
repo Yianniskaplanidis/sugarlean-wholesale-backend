@@ -1,14 +1,22 @@
 // services/templates.confirmOrder.js
-// Expects frontend to POST:
-//   data.customer = { name, email, phone, customerNumber, abn, company? }
-//   data.shippingAddress = object OR string  (object may include .company)
-//   data.extraNotes = textarea value
-//   data.items = [{ sku/ref/title/barcode/qtyBoxes/boxes/qty/quantity/available/soldOut/status }...]
-// Optional:
-//   data.orderId
-//   data.submittedAt / data.submitted / data.createdAt (date/time string or timestamp)
+// ✅ Pixel-matched to your screenshot (header + title + 3 boxed sections + product table)
+// ✅ SAME HTML for orders email + wholesale email (admin + user templates identical)
+// ✅ Supports small product thumbnail images (per item.image / item.imageUrl / etc.)
 
 const { BRAND, SITE_URL, LOGO_URL } = require("./templates");
+
+/* ---------- safe fallbacks (in case BRAND is missing fields) ---------- */
+const B = {
+  WIDTH: (BRAND && BRAND.WIDTH) || 640,
+  BG: (BRAND && BRAND.BG) || "#F3F4F6",
+  CARD: (BRAND && BRAND.CARD) || "#FFFFFF",
+  TEXT: (BRAND && BRAND.TEXT) || "#111111",
+  SUBTLE: (BRAND && BRAND.SUBTLE) || "#6B7280",
+  BORDER: (BRAND && BRAND.BORDER) || "#111111",
+  BLACK: (BRAND && BRAND.BLACK) || "#0B0B0B",
+  YELLOW: (BRAND && BRAND.YELLOW) || "#F5C542",
+  RADIUS: (BRAND && BRAND.RADIUS) || 18,
+};
 
 /* ---------- helpers ---------- */
 const esc = (s = "") =>
@@ -27,61 +35,26 @@ const n = (v, fallback = 0) => {
   return Number.isFinite(num) ? num : fallback;
 };
 
+// ✅ Match your screenshot style: 12/19/2025, 7:52:28 AM
 const fmtDateTime = (v) => {
   const raw = clean(v);
   if (!raw) return "";
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return raw;
   try {
-    return d.toLocaleString("en-AU");
+    return d.toLocaleString("en-US", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "numeric",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+    });
   } catch (e) {
     return d.toISOString();
   }
 };
-
-const pill = (text, tone = "ok") => {
-  const bg = tone === "bad" ? "#FEE2E2" : "#DCFCE7";
-  const fg = tone === "bad" ? "#B00020" : "#166534";
-  const bd = tone === "bad" ? "rgba(239,68,68,.35)" : "rgba(34,197,94,.35)";
-  return `
-    <span style="
-      display:inline-block;
-      padding:5px 9px;
-      border-radius:999px;
-      border:1px solid ${bd};
-      background:${bg};
-      color:${fg};
-      font:900 11px/1 Arial, Helvetica, sans-serif;
-      letter-spacing:.06em;
-      text-transform:uppercase;
-      white-space:nowrap;
-    ">${esc(text)}</span>
-  `;
-};
-
-const card = (innerHTML) => `
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="
-    border:1px solid ${BRAND.BORDER};
-    background:${BRAND.CARD};
-    border-radius:${BRAND.RADIUS}px;
-    overflow:hidden;
-  ">
-    <tr><td style="padding:14px 14px;">
-      ${innerHTML}
-    </td></tr>
-  </table>
-`;
-
-const spacer = (h = 12) =>
-  `<div style="height:${h}px; line-height:${h}px;">&nbsp;</div>`;
-
-const blockTitle = (label) => `
-  <div style="
-    margin:0 0 10px 0;
-    font:900 15px/1.2 'Poppins', Arial, Helvetica, sans-serif;
-    color:${BRAND.TEXT};
-  ">${esc(label)}</div>
-`;
 
 const fmtAddress = (addr) => {
   if (!addr) return "";
@@ -102,163 +75,132 @@ const fmtAddress = (addr) => {
   return parts.join("\n");
 };
 
-/* ---------- SIMPLE INFO GRID (less lines) ---------- */
-const infoGrid = (rows = []) => {
-  const safe = Array.isArray(rows) ? rows : [];
+const getItemImage = (it = {}) => {
+  const direct =
+    clean(it.image) ||
+    clean(it.imageUrl) ||
+    clean(it.image_url) ||
+    clean(it.thumbnail) ||
+    clean(it.thumb) ||
+    clean(it.featuredImage) ||
+    clean(it.featured_image) ||
+    clean(it.productImage) ||
+    clean(it.product_image);
 
-  const items = safe
-    .filter((r) => r && clean(r.label))
-    .map((r, idx) => {
-      const label = esc(r.label);
-      const valueRaw = clean(r.value);
-      const value =
-        valueRaw === ""
-          ? "-"
-          : r.multiline
-          ? escWithBreaks(valueRaw)
-          : esc(valueRaw);
+  if (direct) return direct;
 
-      const showDivider = idx !== safe.length - 1;
+  // common nested formats
+  if (it.image && typeof it.image === "object") {
+    const nested = clean(it.image.src) || clean(it.image.url);
+    if (nested) return nested;
+  }
+  if (it.featured_image && typeof it.featured_image === "object") {
+    const nested = clean(it.featured_image.src) || clean(it.featured_image.url);
+    if (nested) return nested;
+  }
 
-      return `
-        <tr>
-          <td style="padding:10px 0; vertical-align:top;">
-            <div style="
-              font:900 12px/1.2 Arial, Helvetica, sans-serif;
-              letter-spacing:.06em;
-              text-transform:uppercase;
-              color:${BRAND.SUBTLE};
-              margin-bottom:5px;
-            ">${label}</div>
-            <div style="
-              font:500 14px/1.55 Arial, Helvetica, sans-serif;
-              color:${BRAND.TEXT};
-            ">${value}</div>
-            ${showDivider ? `<div style="margin-top:10px;border-top:1px solid ${BRAND.BORDER};"></div>` : ""}
-          </td>
-        </tr>
-      `;
-    })
-    .join("");
+  return "";
+};
 
+const pill = (text, tone = "ok") => {
+  // screenshot-like pill
+  const isBad = tone === "bad";
+  const bg = isBad ? "#FEECEC" : "#EAF7EE";
+  const fg = isBad ? "#8A0F0F" : "#1C6B38";
+  const bd = isBad ? "rgba(220,38,38,.35)" : "rgba(22,163,74,.30)";
   return `
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
-      ${items}
-    </table>
+    <span style="
+      display:inline-block;
+      padding:5px 12px;
+      border-radius:999px;
+      border:1px solid ${bd};
+      background:${bg};
+      color:${fg};
+      font:900 11px/1 Arial, Helvetica, sans-serif;
+      letter-spacing:.10em;
+      text-transform:uppercase;
+      white-space:nowrap;
+    ">${esc(text)}</span>
   `;
 };
 
-/* ---------- base wrapper (Sugarlean style) ---------- */
-const base = ({ title, bodyHTML = "" }) => `
-<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <meta name="x-apple-disable-message-reformatting">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>${esc(title)}</title>
-  </head>
-
-  <body style="margin:0;padding:0;background:${BRAND.BG};">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${BRAND.BG};">
-      <tr>
-        <td style="padding:22px 14px;">
-          <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" width="100%" style="max-width:${BRAND.WIDTH}px;margin:0 auto;">
-
-            <!-- Header -->
-            <tr>
-              <td style="
-                background:${BRAND.BLACK};
-                border-radius:${BRAND.RADIUS}px ${BRAND.RADIUS}px 0 0;
-                padding:34px 18px 18px 18px;
-                text-align:center;
-              ">
-                <img src="${LOGO_URL}" alt="Sugarlean" width="150" style="display:inline-block;border:0;outline:none;text-decoration:none;">
-                <div style="margin-top:10px;font:900 11px/1 Arial, Helvetica, sans-serif;letter-spacing:.18em;text-transform:uppercase;color:${BRAND.YELLOW};">
-                  Wholesale Portal
-                </div>
-              </td>
-            </tr>
-
-            <!-- Title -->
-            <tr>
-              <td style="
-                background:${BRAND.CARD};
-                border-left:1px solid ${BRAND.BORDER};
-                border-right:1px solid ${BRAND.BORDER};
-                padding:18px 18px 8px 18px;
-                text-align:center;
-              ">
-                <div style="font:900 22px/1.25 'Poppins', Arial, Helvetica, sans-serif;color:${BRAND.TEXT};">
-                  ${esc(title)}
-                </div>
-                <div style="margin-top:8px;height:3px;width:84px;background:${BRAND.YELLOW};border-radius:999px;display:inline-block;"></div>
-              </td>
-            </tr>
-
-            <!-- Body -->
-            ${
-              bodyHTML
-                ? `
-            <tr>
-              <td style="
-                background:${BRAND.CARD};
-                border-left:1px solid ${BRAND.BORDER};
-                border-right:1px solid ${BRAND.BORDER};
-                padding:14px 18px 16px 18px;
-              ">
-                ${bodyHTML}
-              </td>
-            </tr>`
-                : ""
-            }
-
-            <!-- Footer -->
-            <tr>
-              <td style="
-                background:${BRAND.CARD};
-                border:1px solid ${BRAND.BORDER};
-                border-top:none;
-                border-radius:0 0 ${BRAND.RADIUS}px ${BRAND.RADIUS}px;
-                padding:12px 16px 16px 16px;
-                text-align:center;
-              ">
-                <div style="font:500 12px/1.6 Arial, Helvetica, sans-serif;color:${BRAND.SUBTLE};">
-                  Sent automatically from
-                  <a href="${SITE_URL}" style="color:${BRAND.YELLOW};text-decoration:none;">www.sugarlean.com.au</a>
-                </div>
-                <div style="margin-top:6px;font:400 12px/1.6 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};">
-                  © ${new Date().getFullYear()} SUGARLEAN PTY LTD
-                </div>
-              </td>
-            </tr>
-
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>
+const box = (innerHTML, extraStyle = "") => `
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="
+    border:1px solid ${B.BORDER};
+    background:${B.CARD};
+    border-radius:0;
+    ${extraStyle}
+  ">
+    <tr>
+      <td style="padding:16px 16px;">
+        ${innerHTML}
+      </td>
+    </tr>
+  </table>
 `;
 
-/* ---------- items table (SIMPLER: less lines) ---------- */
-function orderItemsTable(items = []) {
+const spacer = (h = 12) =>
+  `<div style="height:${h}px; line-height:${h}px; font-size:${h}px;">&nbsp;</div>`;
+
+const label = (txt) => `
+  <div style="
+    font:900 12px/1.2 Arial, Helvetica, sans-serif;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:${B.TEXT};
+    margin:0 0 6px 0;
+  ">${esc(txt)}</div>
+`;
+
+const small = (txt) => `
+  <div style="
+    font:400 12px/1.45 Arial, Helvetica, sans-serif;
+    color:${B.SUBTLE};
+    margin:0;
+  ">${esc(txt)}</div>
+`;
+
+const strongLine = (txt) => `
+  <div style="
+    font:800 13px/1.45 Arial, Helvetica, sans-serif;
+    color:${B.TEXT};
+    margin:0;
+  ">${esc(txt)}</div>
+`;
+
+const twoCol = ({ leftHTML, rightHTML }) => `
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+    <tr>
+      <!--[if mso]><td width="50%" valign="top"><![endif]-->
+      <td valign="top" style="width:50%; padding-right:8px;" class="col">
+        ${leftHTML}
+      </td>
+      <!--[if mso]></td><td width="50%" valign="top"><![endif]-->
+      <td valign="top" style="width:50%; padding-left:8px;" class="col">
+        ${rightHTML}
+      </td>
+      <!--[if mso]></td><![endif]-->
+    </tr>
+  </table>
+`;
+
+/* ---------- product table (with thumbnails) ---------- */
+function orderItemsTableScreenshot(items = []) {
   const safeItems = Array.isArray(items) ? items : [];
 
   const header = `
     <tr>
-      <th style="padding:10px 10px 8px;border-bottom:1px solid ${BRAND.BORDER};background:#F7F7F7;text-align:left;font:900 12px/1.2 Arial, Helvetica, sans-serif;letter-spacing:.06em;text-transform:uppercase;">SKU / REF</th>
-      <th style="padding:10px 10px 8px;border-bottom:1px solid ${BRAND.BORDER};background:#F7F7F7;text-align:left;font:900 12px/1.2 Arial, Helvetica, sans-serif;letter-spacing:.06em;text-transform:uppercase;">Product</th>
-      <th style="padding:10px 10px 8px;border-bottom:1px solid ${BRAND.BORDER};background:#F7F7F7;text-align:center;font:900 12px/1.2 Arial, Helvetica, sans-serif;letter-spacing:.06em;text-transform:uppercase;">Boxes</th>
-      <th style="padding:10px 10px 8px;border-bottom:1px solid ${BRAND.BORDER};background:#F7F7F7;text-align:center;font:900 12px/1.2 Arial, Helvetica, sans-serif;letter-spacing:.06em;text-transform:uppercase;">Status</th>
+      <th style="padding:14px 16px;background:#EFEFEF;border-bottom:1px solid ${B.BORDER};text-align:left;font:900 16px/1.2 Arial, Helvetica, sans-serif;letter-spacing:.04em;">PRODUCT</th>
+      <th style="padding:14px 16px;background:#EFEFEF;border-bottom:1px solid ${B.BORDER};text-align:center;font:900 16px/1.2 Arial, Helvetica, sans-serif;letter-spacing:.04em;">BOXES</th>
+      <th style="padding:14px 16px;background:#EFEFEF;border-bottom:1px solid ${B.BORDER};text-align:center;font:900 16px/1.2 Arial, Helvetica, sans-serif;letter-spacing:.04em;">STATUS</th>
     </tr>
   `;
 
-  const rowsHTML = safeItems
+  const rows = safeItems
     .map((it, idx) => {
-      const sku = clean(it.sku) || clean(it.ref) || "-";
-      const ref = clean(it.ref);
       const title = clean(it.title) || "-";
+      const sku = clean(it.sku) || clean(it.ref) || "";
+      const ref = clean(it.ref);
       const barcode = clean(it.barcode);
 
       const qtyBoxes =
@@ -267,46 +209,71 @@ function orderItemsTable(items = []) {
         n(it.qty, NaN) ||
         n(it.quantity, 0);
 
-      const soldOut =
+      const statusRaw = String(it.status || "").trim().toLowerCase();
+
+      const isBackorder =
         it.available === false ||
         it.soldOut === true ||
-        String(it.status || "").toLowerCase() === "backorder" ||
-        String(it.status || "").toLowerCase() === "back order";
+        statusRaw === "backorder" ||
+        statusRaw === "back order" ||
+        statusRaw === "sold out" ||
+        statusRaw === "soldout";
 
-      const statusText = soldOut ? "Back order" : "In stock";
-      const zebra = idx % 2 === 0 ? "#FFFFFF" : "#FCFCFD";
-      const borderBottom = "1px solid " + BRAND.BORDER;
+      const statusText = isBackorder ? "Back order" : "In stock";
+
+      const img = getItemImage(it);
+      const zebra = idx % 2 === 0 ? "#FFFFFF" : "#FFFFFF"; // screenshot looks clean white; keep consistent
+      const divider = `1px solid rgba(17,17,17,.12)`;
+
+      const vendor =
+        clean(it.vendor) ||
+        clean(it.brand) ||
+        clean(it.company) ||
+        clean(it.collection) ||
+        "";
+
+      const imgCell = img
+        ? `<img src="${esc(img)}" width="34" height="34" style="display:block;border:0;outline:none;text-decoration:none;border-radius:6px;" alt="${esc(title)}">`
+        : `<div style="width:34px;height:34px;border-radius:6px;background:#E5E7EB;border:1px solid rgba(17,17,17,.10);"></div>`;
 
       return `
         <tr>
-          <td style="padding:10px;vertical-align:top;background:${zebra};border-bottom:${borderBottom};">
-            <div style="font:900 13px/1.35 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};">
-              ${esc(sku)}
-            </div>
-            ${
-              ref && ref !== sku
-                ? `<div style="margin-top:4px;font:400 12px/1.55 Arial, Helvetica, sans-serif;color:${BRAND.SUBTLE};">REF: ${esc(ref)}</div>`
-                : ""
-            }
+          <td style="padding:10px 16px;background:${zebra};border-bottom:${divider};">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+              <tr>
+                <td valign="top" style="padding-right:10px;">
+                  ${imgCell}
+                </td>
+                <td valign="top">
+                  ${
+                    vendor
+                      ? `<div style="font:700 10px/1.2 Arial, Helvetica, sans-serif;color:${B.SUBTLE};margin:0 0 2px 0;">${esc(
+                          vendor
+                        )}</div>`
+                      : ""
+                  }
+                  <div style="font:800 12px/1.25 Arial, Helvetica, sans-serif;color:${B.TEXT};margin:0;">
+                    ${esc(title)}
+                  </div>
+                  ${
+                    sku || ref || barcode
+                      ? `<div style="margin-top:3px;font:400 10.5px/1.35 Arial, Helvetica, sans-serif;color:${B.SUBTLE};">
+                          ${sku ? `Ref: ${esc(sku)}` : ref ? `Ref: ${esc(ref)}` : ""}
+                          ${barcode ? `${sku || ref ? "&nbsp;&nbsp;•&nbsp;&nbsp;" : ""}Barcode: ${esc(barcode)}` : ""}
+                        </div>`
+                      : ""
+                  }
+                </td>
+              </tr>
+            </table>
           </td>
 
-          <td style="padding:10px;vertical-align:top;background:${zebra};border-bottom:${borderBottom};">
-            <div style="font:900 13px/1.35 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};">
-              ${esc(title)}
-            </div>
-            ${
-              barcode
-                ? `<div style="margin-top:5px;font:400 12px/1.55 Arial, Helvetica, sans-serif;color:${BRAND.SUBTLE};">Barcode: ${esc(barcode)}</div>`
-                : ""
-            }
-          </td>
-
-          <td style="padding:10px;text-align:center;font:900 13px/1.35 Arial, Helvetica, sans-serif;color:${BRAND.TEXT};background:${zebra};border-bottom:${borderBottom};">
+          <td style="padding:10px 16px;background:${zebra};border-bottom:${divider};text-align:center;font:900 14px/1.2 Arial, Helvetica, sans-serif;color:${B.TEXT};">
             ${esc(String(qtyBoxes))}
           </td>
 
-          <td style="padding:10px;text-align:center;background:${zebra};border-bottom:${borderBottom};">
-            ${soldOut ? pill(statusText, "bad") : pill(statusText, "ok")}
+          <td style="padding:10px 16px;background:${zebra};border-bottom:${divider};text-align:center;">
+            ${isBackorder ? pill(statusText, "bad") : pill(statusText, "ok")}
           </td>
         </tr>
       `;
@@ -315,28 +282,110 @@ function orderItemsTable(items = []) {
 
   const empty = `
     <tr>
-      <td colspan="4" style="padding:12px;border-bottom:1px solid ${BRAND.BORDER};color:${BRAND.SUBTLE};font:400 13px/1.6 Arial, Helvetica, sans-serif;text-align:center;">
+      <td colspan="3" style="padding:14px 16px;text-align:center;color:${B.SUBTLE};font:400 13px/1.6 Arial, Helvetica, sans-serif;">
         No items found.
       </td>
     </tr>
   `;
 
-  const footnote = `
-    <div style="margin-top:10px;font:400 12px/1.6 Arial, Helvetica, sans-serif;color:${BRAND.SUBTLE};">
-      Items marked as <b>Back order</b> are currently unavailable and will be supplied when stock is available.
-    </div>
-  `;
-
   return `
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="
+      border-collapse:collapse;
+      border:1px solid ${B.BORDER};
+    ">
       ${header}
-      ${rowsHTML || empty}
+      ${rows || empty}
     </table>
-    ${footnote}
   `;
 }
 
-/* ---------- layout builder ---------- */
+/* ---------- main email wrapper (matches screenshot layout) ---------- */
+const base = ({ title, bodyHTML = "" }) => `
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="x-apple-disable-message-reformatting">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>${esc(title)}</title>
+
+    <style>
+      /* Mobile stacking for 2-col blocks */
+      @media only screen and (max-width: 640px){
+        .wrap { width: 100% !important; }
+        .pad { padding-left: 12px !important; padding-right: 12px !important; }
+        .col { display:block !important; width:100% !important; padding:0 !important; }
+        .col + .col { padding-top:12px !important; }
+      }
+    </style>
+  </head>
+
+  <body style="margin:0;padding:0;background:${B.BG};">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${B.BG};">
+      <tr>
+        <td class="pad" style="padding:22px 14px;">
+
+          <table role="presentation" align="center" cellpadding="0" cellspacing="0" border="0" width="${B.WIDTH}" class="wrap" style="width:${B.WIDTH}px;max-width:${B.WIDTH}px;margin:0 auto;">
+
+            <!-- Header (black rounded) -->
+            <tr>
+              <td style="
+                background:${B.BLACK};
+                border-radius:${B.RADIUS}px ${B.RADIUS}px 0 0;
+                padding:28px 18px 16px 18px;
+                text-align:center;
+              ">
+                <img src="${LOGO_URL}" alt="Sugarlean" width="155" style="display:inline-block;border:0;outline:none;text-decoration:none;">
+                <div style="margin-top:10px;font:900 12px/1 Arial, Helvetica, sans-serif;letter-spacing:.18em;text-transform:uppercase;color:${B.YELLOW};">
+                  WHOLESALE PORTAL
+                </div>
+              </td>
+            </tr>
+
+            <!-- White title area -->
+            <tr>
+              <td style="background:${B.CARD};padding:18px 18px 10px 18px;text-align:center;">
+                <div style="font:900 30px/1.12 Arial, Helvetica, sans-serif;color:${B.TEXT};">
+                  ${esc(title)}
+                </div>
+              </td>
+            </tr>
+
+            <!-- Main body -->
+            <tr>
+              <td style="background:${B.CARD};padding:10px 18px 18px 18px;">
+                ${bodyHTML}
+              </td>
+            </tr>
+
+            <!-- Footer -->
+            <tr>
+              <td style="
+                background:${B.CARD};
+                border-radius:0 0 ${B.RADIUS}px ${B.RADIUS}px;
+                padding:14px 16px 18px 16px;
+                text-align:center;
+              ">
+                <div style="font:500 12px/1.6 Arial, Helvetica, sans-serif;color:${B.SUBTLE};">
+                  Sent automatically from
+                  <a href="${SITE_URL}" style="color:${B.YELLOW};text-decoration:none;">www.sugarlean.com.au</a>
+                </div>
+                <div style="margin-top:6px;font:400 12px/1.6 Arial, Helvetica, sans-serif;color:${B.TEXT};">
+                  © ${new Date().getFullYear()} SUGARLEAN PTY LTD
+                </div>
+              </td>
+            </tr>
+
+          </table>
+
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+`;
+
+/* ---------- build layout to match your screenshot ---------- */
 function buildOrderEmailLayout(data = {}) {
   const c = data.customer || {};
   const items = Array.isArray(data.items) ? data.items : [];
@@ -356,20 +405,8 @@ function buildOrderEmailLayout(data = {}) {
     "";
 
   const shippingText = fmtAddress(
-    data.shippingAddress ||
-      c.shippingAddress ||
-      c.shipping_address ||
-      data.shipping_address ||
-      ""
+    data.shippingAddress || c.shippingAddress || c.shipping_address || data.shipping_address || ""
   );
-
-  const extra =
-    clean(data.extraNotes) ||
-    clean(data.notes) ||
-    clean(data.customerNotes) ||
-    clean(data.packingNotes) ||
-    clean(data.extraNote) ||
-    "";
 
   const submitted =
     fmtDateTime(data.submittedAt) ||
@@ -377,51 +414,133 @@ function buildOrderEmailLayout(data = {}) {
     fmtDateTime(data.createdAt) ||
     "";
 
-  const customerInfo = `
-    ${blockTitle("Customer Information")}
-    ${infoGrid([
-      { label: "Order ID", value: data.orderId },
-      ...(submitted ? [{ label: "Submitted", value: submitted }] : []),
-      { label: "Customer Number", value: c.customerNumber },
-      { label: "Company", value: companyVal }, /* always show */
-      { label: "Customer name", value: c.name },
-      { label: "Customer email", value: c.email },
-      { label: "Customer phone", value: c.phone },
-      { label: "ABN", value: c.abn },
-    ])}
+  const orderId = clean(data.orderId) || "No Order ID";
+
+  const custNo =
+    clean(c.customerNumber) ||
+    clean(c.customer_no) ||
+    clean(c.customerNo) ||
+    "";
+
+  const abn =
+    clean(c.abn) ||
+    clean(c.abnNumber) ||
+    clean(c.abn_num) ||
+    clean(c.abn_no) ||
+    "";
+
+  const customerName = clean(c.name) || "-";
+  const customerEmail = clean(c.email) || "-";
+  const customerPhone = clean(c.phone) || "-";
+
+  // Google maps link for “select on map”
+  const mapsQ = encodeURIComponent((shippingText || "").replace(/\n/g, ", "));
+  const mapsUrl = mapsQ ? `https://www.google.com/maps/search/?api=1&query=${mapsQ}` : "";
+
+  /* TOP BOX (Wholesaler Order + right details) */
+  const topLeft = `
+    ${label("Wholesaler Order")}
+    ${small("Review your wholesale order summary below.")}
+    <div style="height:16px;line-height:16px;font-size:16px;">&nbsp;</div>
+
+    <div style="font:400 22px/1.25 Arial, Helvetica, sans-serif;color:${B.TEXT};margin:0;">Customer No.</div>
+    <div style="margin-top:8px;font:900 22px/1.15 Arial, Helvetica, sans-serif;color:${B.TEXT};">
+      ${esc(custNo || "-")}
+    </div>
   `;
 
-  const shippingInfo = `
-    ${blockTitle("Shipping Address")}
-    ${infoGrid([{ label: "Address", value: shippingText || "-", multiline: true }])}
+  const rightRow = (k, v, bold = false) => `
+    <div style="margin:0 0 10px 0;">
+      <div style="font:700 13px/1.25 Arial, Helvetica, sans-serif;color:${B.TEXT};">${esc(k)}</div>
+      <div style="font:${bold ? "900" : "700"} 13px/1.25 Arial, Helvetica, sans-serif;color:${B.TEXT};">${esc(
+        v || "-"
+      )}</div>
+    </div>
   `;
 
-  const itemsBlock = `
-    ${blockTitle("Items")}
-    ${orderItemsTable(items)}
+  const topRight = `
+    ${rightRow("Order ID:", orderId, true)}
+    ${rightRow("Wholesaler ABN Number", abn, true)}
+    ${rightRow("Submitted:", submitted, true)}
   `;
 
-  const notesBlock = extra
-    ? `
-      ${blockTitle("Extra notes")}
-      <div style="
-        border:1px solid ${BRAND.BORDER};
-        background:#FAFAFA;
-        border-radius:14px;
-        padding:12px 14px;
-        font:400 13px/1.65 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-        color:${BRAND.TEXT};
-      ">${escWithBreaks(extra)}</div>
-    `
-    : "";
+  const topBox = box(
+    twoCol({
+      leftHTML: topLeft,
+      rightHTML: topRight,
+    })
+  );
+
+  /* Contact Information box */
+  const contactBox = box(`
+    ${label("Contact Information")}
+    <div style="height:4px;line-height:4px;font-size:4px;">&nbsp;</div>
+    ${strongLine(customerName)}
+    <div style="height:8px;line-height:8px;font-size:8px;">&nbsp;</div>
+    ${strongLine(customerEmail)}
+    <div style="height:8px;line-height:8px;font-size:8px;">&nbsp;</div>
+    ${strongLine(customerPhone)}
+    <div style="height:10px;line-height:10px;font-size:10px;">&nbsp;</div>
+    <div style="font:500 12px/1.4 Arial, Helvetica, sans-serif;color:${B.SUBTLE};">
+      Wholesaler ABN Number: <span style="font-weight:900;color:${B.TEXT};">${esc(abn || "-")}</span>
+    </div>
+  `);
+
+  /* Default address box */
+  const addressName = customerName;
+  const addressLines = (shippingText || "-").split("\n").map((x) => clean(x)).filter(Boolean);
+
+  const addressHTML = `
+    ${label("Default address")}
+    <div style="height:4px;line-height:4px;font-size:4px;">&nbsp;</div>
+    ${strongLine(addressName)}
+    <div style="height:8px;line-height:8px;font-size:8px;">&nbsp;</div>
+    <div style="font:500 12px/1.45 Arial, Helvetica, sans-serif;color:${B.SUBTLE};">
+      ${addressLines.length ? addressLines.map((l) => `${esc(l)}<br>`).join("") : esc("-")}
+    </div>
+    ${
+      mapsUrl
+        ? `
+        <div style="height:12px;line-height:12px;font-size:12px;">&nbsp;</div>
+        <a href="${mapsUrl}" style="
+          display:inline-block;
+          border:1px solid rgba(17,17,17,.35);
+          border-radius:999px;
+          padding:7px 12px;
+          font:800 12px/1 Arial, Helvetica, sans-serif;
+          color:${B.TEXT};
+          text-decoration:none;
+          background:#FFFFFF;
+        ">select on map</a>
+      `
+        : ""
+    }
+  `;
+
+  const addressBox = box(addressHTML);
+
+  /* Products table outer box */
+  const productsBox = `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="
+      border:1px solid ${B.BORDER};
+      background:${B.CARD};
+    ">
+      <tr>
+        <td style="padding:0;">
+          ${orderItemsTableScreenshot(items)}
+        </td>
+      </tr>
+    </table>
+  `;
 
   return `
-    ${card(customerInfo)}
+    ${topBox}
     ${spacer(12)}
-    ${card(shippingInfo)}
-    ${notesBlock ? spacer(12) + card(notesBlock) : ""}
+
+    ${twoCol({ leftHTML: contactBox, rightHTML: addressBox })}
     ${spacer(12)}
-    ${card(itemsBlock)}
+
+    ${productsBox}
   `;
 }
 
@@ -433,6 +552,7 @@ function confirmOrderAdminTemplate(data = {}) {
 }
 
 function confirmOrderUserTemplate(data = {}) {
+  // ✅ EXACT same template as admin (per your request)
   const title = "Wholesale Order Summary";
   const bodyHTML = buildOrderEmailLayout(data);
   return base({ title, bodyHTML });
