@@ -50,6 +50,60 @@ function sanitizeAddress(addr) {
   };
 }
 
+// ✅ Extract an image URL from many possible item shapes
+function pickItemImageUrl(it) {
+  if (!it || typeof it !== "object") return "";
+
+  // direct keys
+  let url =
+    t(it.image) ||
+    t(it.imageUrl) ||
+    t(it.image_url) ||
+    t(it.imageSrc) ||
+    t(it.image_src) ||
+    t(it.thumbnail) ||
+    t(it.thumb) ||
+    t(it.featuredImage) ||
+    t(it.featured_image) ||
+    t(it.productImage) ||
+    t(it.product_image) ||
+    "";
+
+  // nested objects
+  if (!url && it.image && typeof it.image === "object") {
+    url = t(it.image.src) || t(it.image.url) || "";
+  }
+  if (!url && it.featured_image && typeof it.featured_image === "object") {
+    url = t(it.featured_image.src) || t(it.featured_image.url) || "";
+  }
+
+  // arrays
+  if (!url && Array.isArray(it.images) && it.images.length) {
+    const first = it.images[0];
+    url = typeof first === "string" ? t(first) : t(first?.src) || t(first?.url) || "";
+  }
+
+  // product nested
+  if (!url && it.product && typeof it.product === "object") {
+    url =
+      t(it.product.featured_image) ||
+      t(it.product.featuredImage) ||
+      t(it.product.image?.src) ||
+      t(it.product.image?.url) ||
+      t(it.product.featured_image?.src) ||
+      t(it.product.featured_image?.url) ||
+      "";
+
+    if (!url && Array.isArray(it.product.images) && it.product.images.length) {
+      const p0 = it.product.images[0];
+      url = typeof p0 === "string" ? t(p0) : t(p0?.src) || t(p0?.url) || "";
+    }
+  }
+
+  // Keep it reasonable length for logs/email payload
+  return clampStr(url, 1200);
+}
+
 /**
  * Build payload from common Shopify/localStorage shapes.
  */
@@ -93,6 +147,8 @@ function buildConfirmOrderPayload(reqBody, req) {
             ? !it.soldOut
             : true;
 
+    const imageUrl = pickItemImageUrl(it);
+
     return {
       title:
         t(it.title) ||
@@ -100,6 +156,12 @@ function buildConfirmOrderPayload(reqBody, req) {
         t(it.productTitle) ||
         t(it.name) ||
         "",
+
+      // ✅ keep brand/vendor if your frontend sends it (shows above title in your email)
+      vendor: clampStr(it.vendor || it.brand || it.company || it.collection || "", 120),
+
+      // ✅ keep image URL so email template can render thumbnails
+      imageUrl,
 
       sku: t(it.sku) || t(it.SKU) || t(it.variant_sku) || t(it.variantSku) || "",
       ref: t(it.ref) || t(it.ref_number) || t(it.refNumber) || "",
@@ -271,6 +333,8 @@ router.post("/confirm-order", async (req, res) => {
         items: data.items?.length || 0,
         hasShipping: !!data.shippingAddress,
         hasExtraNotes: !!t(data.extraNotes),
+        // ✅ quick visibility: how many images came through
+        images: (data.items || []).filter((x) => t(x.imageUrl)).length,
       });
     } catch (err) {
       console.error("💥 Confirm-order send failed (background):", err?.stack || err?.message || err);
@@ -293,6 +357,8 @@ router.post("/confirm-order-sync", async (req, res) => {
       ok: true,
       orderId: data.orderId || null,
       sent: { admin: !!info?.admin, user: !!info?.user },
+      // ✅ helps you confirm thumbnails are present in payload
+      images: (data.items || []).filter((x) => t(x.imageUrl)).length,
     });
   } catch (e) {
     console.error("confirm-order-sync failed:", e?.stack || e);
