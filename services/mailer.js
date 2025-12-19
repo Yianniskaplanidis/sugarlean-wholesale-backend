@@ -15,7 +15,7 @@ try {
 // ---- import templates ----
 const tpl = require("./templates"); // /apply templates (existing)
 
-// NEW: confirm-order templates in separate file (as you wanted)
+// Confirm-order templates in separate file
 let tplConfirm = null;
 try {
   tplConfirm = require("./templates.confirmOrder"); // services/templates.confirmOrder.js
@@ -53,7 +53,7 @@ const confirmAdminTplName =
     "orderAdminEmail",
     "buildOrderAdminEmail"
   ) ||
-  // Backward-compatible fallback: if you kept confirm templates in templates.js
+  // fallback: if confirm templates are still in templates.js
   pickFrom(
     tpl,
     "renderConfirmOrderAdminEmail",
@@ -75,7 +75,7 @@ const confirmUserTplName =
     "orderUserEmail",
     "buildOrderUserEmail"
   ) ||
-  // Backward-compatible fallback: if you kept confirm templates in templates.js
+  // fallback: if confirm templates are still in templates.js
   pickFrom(
     tpl,
     "renderConfirmOrderUserEmail",
@@ -86,6 +86,22 @@ const confirmUserTplName =
     "buildOrderUserEmail"
   ) ||
   null;
+
+// ---------- helpers ----------
+const clean = (v) => (v == null ? "" : String(v)).trim();
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
+
+function isEmail(v) {
+  return EMAIL_RE.test(clean(v));
+}
+
+function splitEmailList(v) {
+  return clean(v)
+    .split(/[;,]/g)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .filter((e) => isEmail(e));
+}
 
 // ---------- which transport? ----------
 const MAIL_TRANSPORT = (process.env.MAIL_TRANSPORT || "smtp").toLowerCase();
@@ -158,24 +174,25 @@ async function graphSend({ to, subject, html, replyTo }) {
   const sender = process.env.GRAPH_SENDER;
   if (!sender) throw new Error("GRAPH_SENDER not set.");
 
+  // support multi recipients
+  const recipients = Array.isArray(to) ? to : splitEmailList(to);
+  if (!recipients.length) throw new Error("No valid recipient(s) for Graph send.");
+
   const msg = {
     subject,
     body: { contentType: "HTML", content: html },
-    toRecipients: [{ emailAddress: { address: to } }],
+    toRecipients: recipients.map((addr) => ({ emailAddress: { address: addr } })),
     from: { emailAddress: { address: sender } },
   };
 
-  // Reply-To (Graph supports replyTo array)
-  if (replyTo) {
+  if (replyTo && isEmail(replyTo)) {
     msg.replyTo = [{ emailAddress: { address: replyTo } }];
   }
 
   const payload = { message: msg, saveToSentItems: true };
 
   const resp = await fetch(
-    `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(
-      sender
-    )}/sendMail`,
+    `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(sender)}/sendMail`,
     {
       method: "POST",
       headers: {
@@ -199,7 +216,18 @@ async function sendMail({ to, subject, html, replyTo }) {
   }
   const smtp = makeSmtpTransport();
   const from = BRAND_FROM || process.env.EMAIL_USER;
-  return smtp.sendMail({ from, to, subject, html, replyTo });
+
+  // support multi recipients for SMTP too
+  const toList = Array.isArray(to) ? to : splitEmailList(to);
+  if (!toList.length) throw new Error("No valid recipient(s) for SMTP send.");
+
+  return smtp.sendMail({
+    from,
+    to: toList.join(", "),
+    subject,
+    html,
+    replyTo: replyTo && isEmail(replyTo) ? replyTo : undefined,
+  });
 }
 
 // Optional verify used at boot
@@ -236,130 +264,49 @@ function esc(s) {
     .replace(/'/g, "&#039;");
 }
 
-function money(n) {
-  const num = Number(n || 0);
-  return num.toFixed(2);
-}
-
+/* NOTE: Fallbacks are ONLY used if confirm templates are missing.
+   If you still see old “New Wholesale Order Submitted …” text,
+   it means your real confirm template wasn’t loaded or exported correctly. */
 function buildConfirmAdminEmailFallback(data) {
   const c = data.customer || {};
-  const items = Array.isArray(data.items) ? data.items : [];
-  const subtotal =
-    Number(data?.totals?.subtotal) ||
-    items.reduce((sum, it) => sum + Number(it.lineTotal || 0), 0);
-
-  const rows = items
-    .map((it) => {
-      return `
-        <tr>
-          <td style="padding:10px;border-bottom:1px solid #eee;">
-            <div style="font-weight:700;">${esc(it.title)}</div>
-            ${it.sku ? `<div style="color:#666;font-size:12px;">SKU: ${esc(it.sku)}</div>` : ""}
-            ${it.ref ? `<div style="color:#666;font-size:12px;">REF: ${esc(it.ref)}</div>` : ""}
-            ${it.barcode ? `<div style="color:#666;font-size:12px;">Barcode: ${esc(it.barcode)}</div>` : ""}
-            ${it.boxQty ? `<div style="color:#666;font-size:12px;">Box QTY: ${esc(it.boxQty)}</div>` : ""}
-            ${it.available === false ? `<div style="margin-top:6px;color:#b00020;font-weight:800;">SOLD OUT / BACK ORDER</div>` : ""}
-          </td>
-          <td style="padding:10px;text-align:center;border-bottom:1px solid #eee;">${esc(it.qtyBoxes)}</td>
-          <td style="padding:10px;text-align:right;border-bottom:1px solid #eee;">$${money(it.price)}</td>
-          <td style="padding:10px;text-align:right;border-bottom:1px solid #eee;">$${money(it.lineTotal)}</td>
-        </tr>
-      `;
-    })
-    .join("");
-
   const subject = `Wholesale Order Submission — ${c.customerNumber || "No Customer #"} — ${c.name || c.email || "Unknown"}`;
-
-  const html = `
-    <div style="font-family:Arial,Helvetica,sans-serif;background:#f6f7fb;padding:24px;">
-      <div style="max-width:820px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #eee;">
-        <div style="padding:18px 20px;background:#111;color:#fff;">
-          <div style="font-size:18px;font-weight:800;">Wholesale Order Submission</div>
-          <div style="opacity:.85;font-size:13px;margin-top:4px;">From: wholesale-confirm-order</div>
-        </div>
-
-        <div style="padding:18px 20px;">
-          <div style="display:flex;flex-wrap:wrap;gap:12px;">
-            <div style="flex:1;min-width:260px;padding:12px;border:1px solid #eee;border-radius:12px;">
-              <div style="font-weight:800;margin-bottom:6px;">Customer</div>
-              <div><b>Name:</b> ${esc(c.name || "")}</div>
-              <div><b>Email:</b> ${esc(c.email || "")}</div>
-              <div><b>Customer #:</b> ${esc(c.customerNumber || "")}</div>
-              ${data.orderId ? `<div><b>Order ID:</b> ${esc(data.orderId)}</div>` : ""}
-              <div style="color:#666;font-size:12px;margin-top:6px;">
-                <b>Shop:</b> ${esc(data.shop || "")}
-              </div>
-            </div>
-
-            <div style="flex:1;min-width:260px;padding:12px;border:1px solid #eee;border-radius:12px;">
-              <div style="font-weight:800;margin-bottom:6px;">Note</div>
-              <div style="white-space:pre-wrap;color:#333;">${esc(data.note || "") || "<span style='color:#888;'>—</span>"}</div>
-            </div>
-          </div>
-
-          <h3 style="margin:18px 0 10px;">Items</h3>
-          <table style="width:100%;border-collapse:collapse;">
-            <thead>
-              <tr>
-                <th style="text-align:left;padding:10px;border-bottom:2px solid #111;">Product</th>
-                <th style="text-align:center;padding:10px;border-bottom:2px solid #111;">Boxes</th>
-                <th style="text-align:right;padding:10px;border-bottom:2px solid #111;">Unit</th>
-                <th style="text-align:right;padding:10px;border-bottom:2px solid #111;">Line</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rows || `<tr><td colspan="4" style="padding:14px;color:#888;">No items found.</td></tr>`}
-            </tbody>
-          </table>
-
-          <div style="display:flex;justify-content:flex-end;margin-top:14px;">
-            <div style="min-width:260px;border:1px solid #eee;border-radius:12px;padding:12px;">
-              <div style="display:flex;justify-content:space-between;">
-                <div style="font-weight:800;">Subtotal</div>
-                <div style="font-weight:800;">$${money(subtotal)}</div>
-              </div>
-              <div style="color:#666;font-size:12px;margin-top:6px;">
-                (Email submission — not a Shopify checkout order)
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-
-  return { subject, html };
-}
-
-function buildConfirmUserEmailFallback(data) {
-  const c = data.customer || {};
-  const subject = `We received your wholesale order — Sugarlean`;
 
   const html = `
     <div style="font-family:Arial,Helvetica,sans-serif;background:#f6f7fb;padding:24px;">
       <div style="max-width:720px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #eee;">
         <div style="padding:18px 20px;background:#111;color:#fff;">
-          <div style="font-size:18px;font-weight:800;">Thanks — we received your order</div>
-          <div style="opacity:.85;font-size:13px;margin-top:4px;">Sugarlean Wholesale</div>
+          <div style="font-size:18px;font-weight:800;">Wholesale Order Summary</div>
         </div>
-
         <div style="padding:18px 20px;color:#111;">
-          <p style="margin:0 0 10px;">Hi ${esc(c.name || "there")},</p>
-          <p style="margin:0 0 10px;">
-            We’ve received your wholesale order submission and our team will process it shortly.
-          </p>
-
-          ${c.customerNumber ? `<p style="margin:0 0 10px;"><b>Customer #:</b> ${esc(c.customerNumber)}</p>` : ""}
-
-          <p style="margin:14px 0 0;color:#666;font-size:13px;">
-            This email confirms your submission (it is not a Shopify checkout order).
-          </p>
+          <div><b>Order ID:</b> ${esc(data.orderId || "-")}</div>
+          <div><b>Customer #:</b> ${esc(c.customerNumber || "-")}</div>
+          <div><b>Name:</b> ${esc(c.name || "-")}</div>
+          <div><b>Email:</b> ${esc(c.email || "-")}</div>
         </div>
       </div>
     </div>
   `;
-
   return { subject, html };
+}
+
+function buildConfirmUserEmailFallback(data) {
+  const c = data.customer || {};
+  return {
+    subject: "Wholesale Order received [DO NOT REPLY]",
+    html: `
+      <div style="font-family:Arial,Helvetica,sans-serif;background:#f6f7fb;padding:24px;">
+        <div style="max-width:720px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #eee;">
+          <div style="padding:18px 20px;background:#111;color:#fff;">
+            <div style="font-size:18px;font-weight:800;">Wholesale Order Summary</div>
+          </div>
+          <div style="padding:18px 20px;color:#111;">
+            <p style="margin:0 0 10px;">Hi ${esc(c.name || "there")},</p>
+            <p style="margin:0;">We received your wholesale order. Our team will process it shortly.</p>
+          </div>
+        </div>
+      </div>
+    `,
+  };
 }
 
 /* -------------------------- public API used by routes -------------------------- */
@@ -396,7 +343,7 @@ async function sendWholesaleEmails(data) {
 /**
  * Confirm order email sending:
  * - Admin goes to CONFIRM_ORDER_TO (or WHOLESALE_TO or ADMIN_EMAIL as fallback)
- * - Optional user confirmation goes to customer.email (controlled by env CONFIRM_SEND_USER=true)
+ * - Customer ALWAYS receives a copy (to data.customer.email) if valid
  *
  * Prefers services/templates.confirmOrder.js; falls back only if missing.
  */
@@ -406,7 +353,10 @@ async function sendConfirmOrderEmails(data) {
   // ----- build admin email -----
   let adminEmail;
   if (confirmAdminTplName) {
-    const source = tplConfirm && typeof tplConfirm[confirmAdminTplName] === "function" ? tplConfirm : tpl;
+    const source =
+      tplConfirm && typeof tplConfirm[confirmAdminTplName] === "function"
+        ? tplConfirm
+        : tpl;
     adminEmail = await source[confirmAdminTplName](data); // { subject, html }
   } else {
     if (!_warnedConfirmFallback) {
@@ -419,10 +369,13 @@ async function sendConfirmOrderEmails(data) {
     adminEmail = buildConfirmAdminEmailFallback(data);
   }
 
-  // ----- build user email (optional) -----
+  // ----- build user email -----
   let userEmail;
   if (confirmUserTplName) {
-    const source = tplConfirm && typeof tplConfirm[confirmUserTplName] === "function" ? tplConfirm : tpl;
+    const source =
+      tplConfirm && typeof tplConfirm[confirmUserTplName] === "function"
+        ? tplConfirm
+        : tpl;
     userEmail = await source[confirmUserTplName](data); // { subject, html }
   } else {
     userEmail = buildConfirmUserEmailFallback(data);
@@ -434,31 +387,31 @@ async function sendConfirmOrderEmails(data) {
     process.env.WHOLESALE_TO ||
     process.env.ADMIN_EMAIL;
 
-  if (!adminTo) {
+  const adminList = Array.isArray(adminTo) ? adminTo : splitEmailList(adminTo || "");
+  if (!adminList.length) {
     throw new Error(
       "No admin recipient configured. Set CONFIRM_ORDER_TO or WHOLESALE_TO or ADMIN_EMAIL."
     );
   }
 
-  // Admin email: reply-to should be the customer email if present
+  const customerEmail = clean(data?.customer?.email);
+
+  // Admin email: reply-to should be customer email if valid
   await sendMail({
-    to: adminTo,
+    to: adminList,
     subject: adminEmail.subject,
     html: adminEmail.html,
-    replyTo: data?.customer?.email || undefined,
+    replyTo: isEmail(customerEmail) ? customerEmail : undefined,
   });
   results.admin = true;
 
-  // User email is optional
-  const sendUser =
-    String(process.env.CONFIRM_SEND_USER || "false").toLowerCase() === "true";
-
-  const customerEmail = data?.customer?.email;
-  if (sendUser && customerEmail) {
+  // Customer email: ALWAYS send if valid
+  if (isEmail(customerEmail)) {
     await sendMail({
       to: customerEmail,
       subject: userEmail.subject,
       html: userEmail.html,
+      replyTo: "wholesale@sugarlean.com.au", // optional (feel free to change/remove)
     });
     results.user = true;
   }
