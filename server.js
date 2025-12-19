@@ -2,7 +2,8 @@
 const express = require("express");
 const router = express.Router();
 
-const { sendWholesaleEmails } = require("../services/mailer");
+const { sendWholesaleEmails } = require("./services/mailer");
+
 
 /* ----------------------------- helpers ----------------------------- */
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
