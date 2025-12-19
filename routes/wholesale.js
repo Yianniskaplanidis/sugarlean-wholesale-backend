@@ -5,6 +5,61 @@ const router = express.Router();
 // uses services/mailer.js
 const { sendWholesaleEmails } = require("../services/mailer");
 
+/* ----------------------------- CORS + WS TOKEN ----------------------------- */
+
+// If you have a specific domain(s), set env CORS_ORIGIN to:
+// "https://sugarlean.com.au,https://www.sugarlean.com.au"
+const CORS_ORIGIN = (process.env.CORS_ORIGIN || "*").trim();
+
+function setCors(res) {
+  // If you use "*" it's simplest (no cookies/credentials)
+  res.setHeader("Access-Control-Allow-Origin", CORS_ORIGIN === "*" ? "*" : CORS_ORIGIN);
+  res.setHeader("Vary", "Origin");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, x-ws-token, Authorization"
+  );
+  res.setHeader("Access-Control-Max-Age", "86400");
+}
+
+// Handle preflight BEFORE any auth
+router.use((req, res, next) => {
+  setCors(res);
+  if (req.method === "OPTIONS") return res.sendStatus(204);
+  next();
+});
+
+// WS token auth for /api/wholesale/*
+const expectedToken = String(
+  process.env.WS_TOKEN || process.env.API_WS_TOKEN || ""
+).trim();
+
+function wsAuth(req, res, next) {
+  // Allow pings without token so you can test in browser
+  const isPing = req.method === "GET" && (req.path === "/ping" || req.path === "/confirm-order/ping");
+  if (isPing) return next();
+
+  // If you want the server to boot even when token missing, keep this,
+  // but it will effectively block protected endpoints until you set WS_TOKEN.
+  if (!expectedToken) {
+    return res.status(500).json({
+      ok: false,
+      error: "Server WS token not configured",
+      hint: "Set WS_TOKEN (or API_WS_TOKEN) in Render environment variables",
+    });
+  }
+
+  const got = String(req.get("x-ws-token") || "").trim();
+  if (!got || got !== expectedToken) {
+    return res.status(401).json({ ok: false, error: "unauthorized" });
+  }
+
+  next();
+}
+
+router.use(wsAuth);
+
 /* ----------------------------- helpers ----------------------------- */
 
 // loose email regex
@@ -116,7 +171,7 @@ function validatePayload(data) {
 
 /* ------------------------------ routes ------------------------------ */
 
-// quick router check
+// quick router check (no token required due to wsAuth exception)
 router.get("/ping", (_req, res) => res.json({ ok: true, route: "wholesale" }));
 
 /**
