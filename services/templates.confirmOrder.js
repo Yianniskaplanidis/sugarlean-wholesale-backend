@@ -1,15 +1,13 @@
 // services/templates.confirmOrder.js
-// ✅ Screenshot-style layout (matches your target screenshot)
-// ✅ Wider wrapper (default 760px) + responsive
+// ✅ Screenshot-style layout
+// ✅ Contact + Default address combined into ONE block (2 columns inside)
+// ✅ Remove the big "Wholesale Order Summary" title row entirely
 // ✅ Thin borders + clean dividers (no shadows)
 // ✅ Block headings: 16px / 500
 // ✅ Block details: 12px / 400 (no bold in blocks)
-// ✅ Remove ABN line from Contact Information block
 // ✅ Submitted shows AU local time (Australia/Brisbane) — fallback to "now"
-// ✅ Email Title ("Wholesale Order Summary") smaller + weight 700
 // ✅ Items table: no outer outline, no vertical grid lines, tighter SKU/REF + BOXES, product title max 2 lines
 // ✅ Keep STATUS pill
-// ✅ Contact + Default address cards same height
 
 const { BRAND, SITE_URL, LOGO_URL } = require("./templates");
 
@@ -129,7 +127,7 @@ const pill = (text, tone = "ok") => {
   `;
 };
 
-/* ✅ screenshot-style box (thin border, square corners) */
+/* ✅ screenshot-style box */
 const box = (innerHTML, extraStyle = "", cellStyle = "") => `
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="
     border:1px solid ${B.LINE_STRONG};
@@ -150,18 +148,17 @@ const box = (innerHTML, extraStyle = "", cellStyle = "") => `
   </table>
 `;
 
-/* ✅ block heading: 16px / 500 */
+/* ✅ headings & details */
 const h16 = (txt) => `
   <div style="
     font-family:${B.FONT};
     font-size:16px;
     font-weight:500;
     color:${B.TEXT};
-    margin:0 0 6px 0;
+    margin:0 0 10px 0;
   ">${esc(txt)}</div>
 `;
 
-/* ✅ details: 12px / 400 */
 const p12 = (txt, color = B.TEXT) => `
   <div style="
     font-family:${B.FONT};
@@ -173,7 +170,6 @@ const p12 = (txt, color = B.TEXT) => `
   ">${esc(txt)}</div>
 `;
 
-/* ✅ top-left "Wholesaler Order" */
 const topLeadTitle = (txt) => `
   <div style="
     font-family:${B.FONT};
@@ -195,11 +191,11 @@ const twoCol = ({ leftHTML, rightHTML }) => `
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
     <tr>
       <!--[if mso]><td width="50%" valign="top"><![endif]-->
-      <td valign="top" style="width:50%; padding-right:10px;" class="col">
+      <td valign="top" style="width:50%; padding-right:12px;" class="col">
         ${leftHTML}
       </td>
       <!--[if mso]></td><td width="50%" valign="top"><![endif]-->
-      <td valign="top" style="width:50%; padding-left:10px;" class="col">
+      <td valign="top" style="width:50%; padding-left:12px;" class="col">
         ${rightHTML}
       </td>
       <!--[if mso]></td><![endif]-->
@@ -207,13 +203,13 @@ const twoCol = ({ leftHTML, rightHTML }) => `
   </table>
 `;
 
-/* ---------- items table (no outline, no vertical lines) ---------- */
+/* ---------- items table ---------- */
 function orderItemsTableScreenshot(items = []) {
   const safeItems = Array.isArray(items) ? items : [];
 
-  const COL_REF = 80;     // tighter
-  const COL_BOX = 70;     // tighter
-  const COL_STATUS = 130; // stable width for pills
+  const COL_REF = 80;
+  const COL_BOX = 70;
+  const COL_STATUS = 130;
 
   const th = (txt, align = "left", widthPx = null) => `
     <th style="
@@ -272,7 +268,6 @@ function orderItemsTableScreenshot(items = []) {
 
       const statusText = isBackorder ? "Back order" : "In stock";
 
-      // ✅ 2-line clamp using inline CSS tricks (works in most modern clients; older clients just wrap)
       const titleHTML = `
         <div style="
           font-family:${B.FONT};
@@ -308,11 +303,7 @@ function orderItemsTableScreenshot(items = []) {
             white-space:nowrap;
           ">${esc(ref)}</td>
 
-          <td style="
-            padding:14px 12px;
-            border-bottom:${rowDivider};
-            text-align:left;
-          ">
+          <td style="padding:14px 12px;border-bottom:${rowDivider};text-align:left;">
             ${titleHTML}
             ${barcodeHTML}
           </td>
@@ -349,7 +340,6 @@ function orderItemsTableScreenshot(items = []) {
     </tr>
   `;
 
-  // ✅ NO outer border/outline
   return `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="
       border-collapse:collapse;
@@ -362,14 +352,14 @@ function orderItemsTableScreenshot(items = []) {
 }
 
 /* ---------- main email wrapper ---------- */
-const base = ({ title, bodyHTML = "" }) => `
+const base = ({ bodyHTML = "" }) => `
 <!doctype html>
 <html>
   <head>
     <meta charset="utf-8">
     <meta name="x-apple-disable-message-reformatting">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>${esc(title)}</title>
+    <title>Wholesale Order</title>
 
     <style>
       @media only screen and (max-width: 740px){
@@ -377,7 +367,7 @@ const base = ({ title, bodyHTML = "" }) => `
         .pad { padding-left: 12px !important; padding-right: 12px !important; }
         .col { display:block !important; width:100% !important; padding:0 !important; }
         .col + .col { padding-top:12px !important; }
-        .h1 { font-size: 22px !important; }
+        .vline { display:none !important; } /* hide divider on mobile */
       }
     </style>
   </head>
@@ -410,24 +400,9 @@ const base = ({ title, bodyHTML = "" }) => `
               </td>
             </tr>
 
-            <!-- Title (smaller + 700) -->
+            <!-- Body (no big title row) -->
             <tr>
-              <td style="background:${B.CARD};padding:16px 22px 8px 22px;text-align:center;">
-                <div class="h1" style="
-                  font-family:${B.FONT};
-                  font-weight:700;
-                  font-size:26px;
-                  letter-spacing:-0.01em;
-                  color:${B.TEXT};
-                  line-height:1.2;
-                  margin:0;
-                ">${esc(title)}</div>
-              </td>
-            </tr>
-
-            <!-- Body -->
-            <tr>
-              <td style="background:${B.CARD};padding:10px 22px 22px 22px;">
+              <td style="background:${B.CARD};padding:18px 22px 22px 22px;">
                 ${bodyHTML}
               </td>
             </tr>
@@ -468,13 +443,7 @@ function buildOrderEmailLayout(data = {}) {
     data.shippingAddress || c.shippingAddress || c.shipping_address || data.shipping_address || ""
   );
 
-  const submittedRaw =
-    data.submittedAt ||
-    data.submitted ||
-    data.createdAt ||
-    "";
-
-  // ✅ if missing, use now
+  const submittedRaw = data.submittedAt || data.submitted || data.createdAt || "";
   const submitted = fmtDateTime(submittedRaw || new Date().toISOString()) || fmtDateTime(new Date().toISOString());
 
   const orderId = clean(data.orderId) || "No Order ID";
@@ -515,21 +484,7 @@ function buildOrderEmailLayout(data = {}) {
 
   const topBox = box(twoCol({ leftHTML: topLeft, rightHTML: topRight }));
 
-  /* Contact + Address same height */
-  const CARD_MIN_H = "min-height:210px; vertical-align:top;";
-
-  const contactBox = box(`
-    ${h16("Contact information")}
-    ${spacer(8)}
-    ${p12(customerName, B.TEXT)}
-    ${spacer(10)}
-    ${p12(customerEmail, B.TEXT)}
-    ${spacer(10)}
-    ${p12(customerPhone, B.TEXT)}
-    ${spacer(34)}
-  `, "", CARD_MIN_H);
-
-  /* Default address (remove duplicate name line) */
+  /* ✅ Combined Contact + Default address in ONE block (2 columns inside) */
   let addressLines = (shippingText || "-")
     .split("\n")
     .map((x) => clean(x))
@@ -539,16 +494,22 @@ function buildOrderEmailLayout(data = {}) {
     addressLines = addressLines.slice(1);
   }
 
-  const addressBox = box(`
-    ${h16("Default address")}
-    ${spacer(8)}
+  const contactInner = `
+    ${h16("Contact information")}
     ${p12(customerName, B.TEXT)}
     ${spacer(10)}
+    ${p12(customerEmail, B.TEXT)}
+    ${spacer(10)}
+    ${p12(customerPhone, B.TEXT)}
+  `;
 
+  const addressInner = `
+    ${h16("Default address")}
+    ${p12(customerName, B.TEXT)}
+    ${spacer(10)}
     <div style="font-family:${B.FONT}; font-size:12px; font-weight:400; line-height:1.6; color:${B.SUBTLE};">
       ${addressLines.length ? addressLines.map((l) => `${esc(l)}<br>`).join("") : esc("-")}
     </div>
-
     ${
       mapsUrl
         ? `
@@ -569,9 +530,28 @@ function buildOrderEmailLayout(data = {}) {
       `
         : ""
     }
-  `, "", CARD_MIN_H);
+  `;
 
-  /* Items block (like your screenshot) */
+  const contactAddressBox = box(`
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+      <tr>
+        <td valign="top" style="width:50%; padding-right:14px;">
+          ${contactInner}
+        </td>
+
+        <!-- vertical divider -->
+        <td class="vline" valign="top" style="width:1px; background:${B.LINE}; font-size:0; line-height:0;">
+          &nbsp;
+        </td>
+
+        <td valign="top" style="width:50%; padding-left:14px;">
+          ${addressInner}
+        </td>
+      </tr>
+    </table>
+  `);
+
+  /* Items block */
   const itemsBox = box(`
     ${h16("Items")}
     ${spacer(10)}
@@ -585,7 +565,7 @@ function buildOrderEmailLayout(data = {}) {
   return `
     ${topBox}
     ${spacer(14)}
-    ${twoCol({ leftHTML: contactBox, rightHTML: addressBox })}
+    ${contactAddressBox}
     ${spacer(14)}
     ${itemsBox}
   `;
@@ -593,15 +573,13 @@ function buildOrderEmailLayout(data = {}) {
 
 /* ---------- templates ---------- */
 function confirmOrderAdminTemplate(data = {}) {
-  const title = "Wholesale Order Summary";
   const bodyHTML = buildOrderEmailLayout(data);
-  return base({ title, bodyHTML });
+  return base({ bodyHTML });
 }
 
 function confirmOrderUserTemplate(data = {}) {
-  const title = "Wholesale Order Summary";
   const bodyHTML = buildOrderEmailLayout(data);
-  return base({ title, bodyHTML });
+  return base({ bodyHTML });
 }
 
 /* ---------- exports expected by mailer.js ---------- */
