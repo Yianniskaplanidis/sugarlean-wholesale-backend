@@ -1,11 +1,15 @@
 // services/templates.confirmOrder.js
 // ✅ Screenshot-style layout (matches your target screenshot)
-// ✅ Titles (block headings): 16px / 500
-// ✅ Details (content): 12px / 400 (no bold in blocks)
-// ✅ Remove ABN line from Contact Information
-// ✅ Submitted always shows date/time (fallback to now)
-// ✅ Items table: no outline, no vertical grid lines, tighter SKU/REF + BOXES, product title max 2 lines
-// ✅ Smaller STATUS pill
+// ✅ Wider wrapper (default 760px) + responsive
+// ✅ Thin borders + clean dividers (no shadows)
+// ✅ Block headings: 16px / 500
+// ✅ Block details: 12px / 400 (no bold in blocks)
+// ✅ Remove ABN line from Contact Information block
+// ✅ Submitted shows AU local time (Australia/Brisbane) — fallback to "now"
+// ✅ Email Title ("Wholesale Order Summary") smaller + weight 700
+// ✅ Items table: no outer outline, no vertical grid lines, tighter SKU/REF + BOXES, product title max 2 lines
+// ✅ Keep STATUS pill
+// ✅ Contact + Default address cards same height
 
 const { BRAND, SITE_URL, LOGO_URL } = require("./templates");
 
@@ -50,14 +54,16 @@ const norm = (s) =>
     .toLowerCase()
     .replace(/\s+/g, " ");
 
+/* ✅ local AU time (QLD / GMT+10) */
 const fmtDateTime = (v) => {
   const raw = clean(v);
   if (!raw) return "";
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return raw;
+
   try {
-    // AU style like your screenshot
-    return d.toLocaleString("en-AU", {
+    return new Intl.DateTimeFormat("en-AU", {
+      timeZone: "Australia/Brisbane",
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
@@ -65,9 +71,13 @@ const fmtDateTime = (v) => {
       minute: "2-digit",
       second: "2-digit",
       hour12: true,
-    });
+    }).format(d);
   } catch (e) {
-    return d.toISOString();
+    try {
+      return d.toLocaleString("en-AU");
+    } catch (e2) {
+      return d.toISOString();
+    }
   }
 };
 
@@ -94,7 +104,7 @@ const fmtAddress = (addr) => {
 const spacer = (h = 12) =>
   `<div style="height:${h}px; line-height:${h}px; font-size:${h}px;">&nbsp;</div>`;
 
-/* ✅ smaller status pill */
+/* ✅ keep STATUS pill */
 const pill = (text, tone = "ok") => {
   const isBad = tone === "bad";
   const bg = isBad ? "#FEECEC" : "#EAF7EE";
@@ -119,8 +129,8 @@ const pill = (text, tone = "ok") => {
   `;
 };
 
-/* ✅ screenshot-style box (thin border, no shadow, square corners) */
-const box = (innerHTML, extraStyle = "") => `
+/* ✅ screenshot-style box (thin border, square corners) */
+const box = (innerHTML, extraStyle = "", cellStyle = "") => `
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="
     border:1px solid ${B.LINE_STRONG};
     background:${B.CARD};
@@ -129,74 +139,56 @@ const box = (innerHTML, extraStyle = "") => `
     ${extraStyle}
   ">
     <tr>
-      <td style="padding:18px 18px; font-family:${B.FONT};">
+      <td style="
+        padding:18px 18px;
+        font-family:${B.FONT};
+        ${cellStyle}
+      ">
         ${innerHTML}
       </td>
     </tr>
   </table>
 `;
 
-/* ✅ TITLES: 16px / 500 */
-const title16 = (txt) => `
+/* ✅ block heading: 16px / 500 */
+const h16 = (txt) => `
   <div style="
     font-family:${B.FONT};
     font-size:16px;
     font-weight:500;
     color:${B.TEXT};
-    margin:0 0 4px 0;
+    margin:0 0 6px 0;
   ">${esc(txt)}</div>
 `;
 
-/* ✅ DETAILS: 12px / 400 (no bold) */
-const detail12 = (txt, color = B.TEXT) => `
+/* ✅ details: 12px / 400 */
+const p12 = (txt, color = B.TEXT) => `
   <div style="
     font-family:${B.FONT};
     font-size:12px;
     font-weight:400;
-    line-height:1.55;
+    line-height:1.6;
     color:${color};
     margin:0;
   ">${esc(txt)}</div>
 `;
 
-const customerLabel = (txt) => `
+/* ✅ top-left "Wholesaler Order" */
+const topLeadTitle = (txt) => `
   <div style="
     font-family:${B.FONT};
-    font-size:16px;
-    font-weight:500;
+    font-size:18px;
+    font-weight:600;
     color:${B.TEXT};
-    margin:14px 0 6px 0;
+    margin:0 0 4px 0;
   ">${esc(txt)}</div>
 `;
-
-const customerNumber = (txt) => detail12(txt || "-", B.TEXT);
 
 const rightRow = (k, v) => `
   <div style="margin:0 0 12px 0;">
-    ${title16(k)}
-    ${detail12(v || "-", B.TEXT)}
+    ${h16(k)}
+    ${p12(v || "-", B.TEXT)}
   </div>
-`;
-
-const sectionTitle = (txt) => `
-  <div style="
-    font-family:${B.FONT};
-    font-size:16px;
-    font-weight:500;
-    color:${B.TEXT};
-    margin:0 0 12px 0;
-  ">${esc(txt)}</div>
-`;
-
-const noteLine = (html) => `
-  <div style="
-    margin-top:12px;
-    font-family:${B.FONT};
-    font-size:12px;
-    font-weight:400;
-    line-height:1.55;
-    color:${B.SUBTLE};
-  ">${html}</div>
 `;
 
 const twoCol = ({ leftHTML, rightHTML }) => `
@@ -215,14 +207,13 @@ const twoCol = ({ leftHTML, rightHTML }) => `
   </table>
 `;
 
-/* ---------- items table (SKU/REF | PRODUCT | BOXES | STATUS) ---------- */
+/* ---------- items table (no outline, no vertical lines) ---------- */
 function orderItemsTableScreenshot(items = []) {
   const safeItems = Array.isArray(items) ? items : [];
 
-  // tighter columns (tidy like screenshot)
-  const COL_REF = 90;
-  const COL_BOX = 70;
-  const COL_STATUS = 130;
+  const COL_REF = 80;     // tighter
+  const COL_BOX = 70;     // tighter
+  const COL_STATUS = 130; // stable width for pills
 
   const th = (txt, align = "left", widthPx = null) => `
     <th style="
@@ -250,7 +241,6 @@ function orderItemsTableScreenshot(items = []) {
     </tr>
   `;
 
-  // subtle row divider only (no table outline, no vertical lines)
   const rowDivider = `1px solid ${B.LINE}`;
 
   const rows = safeItems
@@ -282,9 +272,31 @@ function orderItemsTableScreenshot(items = []) {
 
       const statusText = isBackorder ? "Back order" : "In stock";
 
+      // ✅ 2-line clamp using inline CSS tricks (works in most modern clients; older clients just wrap)
+      const titleHTML = `
+        <div style="
+          font-family:${B.FONT};
+          font-size:12px;
+          font-weight:500;
+          line-height:1.35;
+          color:${B.TEXT};
+          margin:0;
+          display:-webkit-box;
+          -webkit-line-clamp:2;
+          -webkit-box-orient:vertical;
+          overflow:hidden;
+          word-break:break-word;
+        ">${esc(title)}</div>
+      `;
+
+      const barcodeHTML = barcode
+        ? `<div style="margin-top:4px;font-family:${B.FONT};font-size:12px;font-weight:400;line-height:1.35;color:${B.SUBTLE};">
+            Barcode: ${esc(barcode)}
+          </div>`
+        : "";
+
       return `
         <tr>
-          <!-- SKU / REF (tight) -->
           <td style="
             padding:14px 12px;
             border-bottom:${rowDivider};
@@ -294,64 +306,32 @@ function orderItemsTableScreenshot(items = []) {
             font-weight:400;
             color:${B.TEXT};
             white-space:nowrap;
-            width:${COL_REF}px;
           ">${esc(ref)}</td>
 
-          <!-- PRODUCT (2-line clamp) -->
           <td style="
             padding:14px 12px;
             border-bottom:${rowDivider};
             text-align:left;
           ">
-            <div style="
-              font-family:${B.FONT};
-              font-size:12px;
-              font-weight:400;
-              line-height:1.35;
-              color:${B.TEXT};
-              margin:0;
-              display:-webkit-box;
-              -webkit-line-clamp:2;
-              -webkit-box-orient:vertical;
-              overflow:hidden;
-            ">${esc(title)}</div>
-
-            ${
-              barcode
-                ? `<div style="
-                    margin-top:6px;
-                    font-family:${B.FONT};
-                    font-size:12px;
-                    font-weight:400;
-                    line-height:1.35;
-                    color:${B.SUBTLE};
-                    white-space:nowrap;
-                    overflow:hidden;
-                    text-overflow:ellipsis;
-                  ">Barcode: ${esc(barcode)}</div>`
-                : ""
-            }
+            ${titleHTML}
+            ${barcodeHTML}
           </td>
 
-          <!-- BOXES (tight) -->
           <td style="
-            padding:14px 10px;
+            padding:14px 12px;
             border-bottom:${rowDivider};
             text-align:center;
             font-family:${B.FONT};
             font-size:12px;
             font-weight:400;
             color:${B.TEXT};
-            width:${COL_BOX}px;
             white-space:nowrap;
           ">${esc(String(qtyBoxes))}</td>
 
-          <!-- STATUS -->
           <td style="
-            padding:14px 10px;
+            padding:14px 12px;
             border-bottom:${rowDivider};
             text-align:center;
-            width:${COL_STATUS}px;
             white-space:nowrap;
           ">
             ${isBackorder ? pill(statusText, "bad") : pill(statusText, "ok")}
@@ -363,27 +343,17 @@ function orderItemsTableScreenshot(items = []) {
 
   const empty = `
     <tr>
-      <td colspan="4" style="
-        padding:14px 12px;
-        text-align:center;
-        color:${B.SUBTLE};
-        font-family:${B.FONT};
-        font-size:12px;
-        font-weight:400;
-        line-height:1.6;
-        border-bottom:${rowDivider};
-      ">
+      <td colspan="4" style="padding:14px 16px;text-align:center;color:${B.SUBTLE};font-family:${B.FONT};font-size:12px;font-weight:400;line-height:1.6;">
         No items found.
       </td>
     </tr>
   `;
 
-  // ✅ NO outline / NO vertical grid lines
+  // ✅ NO outer border/outline
   return `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="
       border-collapse:collapse;
       font-family:${B.FONT};
-      background:#fff;
     ">
       ${header}
       ${rows || empty}
@@ -407,7 +377,7 @@ const base = ({ title, bodyHTML = "" }) => `
         .pad { padding-left: 12px !important; padding-right: 12px !important; }
         .col { display:block !important; width:100% !important; padding:0 !important; }
         .col + .col { padding-top:12px !important; }
-        .h1 { font-size: 28px !important; }
+        .h1 { font-size: 22px !important; }
       }
     </style>
   </head>
@@ -431,7 +401,7 @@ const base = ({ title, bodyHTML = "" }) => `
                 <div style="
                   margin-top:8px;
                   font-family:${B.FONT};
-                  font-weight:900;
+                  font-weight:800;
                   font-size:12px;
                   letter-spacing:.16em;
                   text-transform:uppercase;
@@ -440,16 +410,17 @@ const base = ({ title, bodyHTML = "" }) => `
               </td>
             </tr>
 
-            <!-- Title -->
+            <!-- Title (smaller + 700) -->
             <tr>
               <td style="background:${B.CARD};padding:16px 22px 8px 22px;text-align:center;">
                 <div class="h1" style="
                   font-family:${B.FONT};
-                  font-weight:900;
-                  font-size:34px;
+                  font-weight:700;
+                  font-size:26px;
                   letter-spacing:-0.01em;
                   color:${B.TEXT};
-                  line-height:1.12;
+                  line-height:1.2;
+                  margin:0;
                 ">${esc(title)}</div>
               </td>
             </tr>
@@ -471,7 +442,7 @@ const base = ({ title, bodyHTML = "" }) => `
               ">
                 <div style="font-family:${B.FONT}; font-size:12px; line-height:1.6; color:${B.SUBTLE}; font-weight:400;">
                   Sent automatically from
-                  <a href="${SITE_URL}" style="color:${B.YELLOW};text-decoration:none;font-weight:800;">www.sugarlean.com.au</a>
+                  <a href="${SITE_URL}" style="color:${B.YELLOW};text-decoration:none;font-weight:700;">www.sugarlean.com.au</a>
                 </div>
                 <div style="margin-top:6px;font-family:${B.FONT}; font-size:12px; line-height:1.6; color:${B.TEXT}; font-weight:400;">
                   © ${new Date().getFullYear()} SUGARLEAN PTY LTD
@@ -497,15 +468,14 @@ function buildOrderEmailLayout(data = {}) {
     data.shippingAddress || c.shippingAddress || c.shipping_address || data.shipping_address || ""
   );
 
-  // ✅ ensure Submitted always has date/time (fallback to NOW)
   const submittedRaw =
     data.submittedAt ||
     data.submitted ||
     data.createdAt ||
-    data.updatedAt ||
-    new Date().toISOString();
+    "";
 
-  const submitted = fmtDateTime(submittedRaw) || fmtDateTime(new Date().toISOString());
+  // ✅ if missing, use now
+  const submitted = fmtDateTime(submittedRaw || new Date().toISOString()) || fmtDateTime(new Date().toISOString());
 
   const orderId = clean(data.orderId) || "No Order ID";
   const custNo =
@@ -530,10 +500,11 @@ function buildOrderEmailLayout(data = {}) {
 
   /* TOP BOX */
   const topLeft = `
-    ${title16("Wholesaler Order")}
-    ${detail12("Review your wholesale order summary below.", B.TEXT)}
-    ${customerLabel("Customer No.")}
-    ${customerNumber(custNo)}
+    ${topLeadTitle("Wholesaler Order")}
+    ${p12("Review your wholesale order summary below.", B.TEXT)}
+    ${spacer(10)}
+    ${h16("Customer No.")}
+    ${p12(custNo, B.TEXT)}
   `;
 
   const topRight = `
@@ -544,16 +515,19 @@ function buildOrderEmailLayout(data = {}) {
 
   const topBox = box(twoCol({ leftHTML: topLeft, rightHTML: topRight }));
 
-  /* Contact box (NO ABN line here) */
+  /* Contact + Address same height */
+  const CARD_MIN_H = "min-height:210px; vertical-align:top;";
+
   const contactBox = box(`
-    ${title16("Contact information")}
+    ${h16("Contact information")}
     ${spacer(8)}
-    ${detail12(customerName, B.TEXT)}
+    ${p12(customerName, B.TEXT)}
     ${spacer(10)}
-    ${detail12(customerEmail, B.TEXT)}
+    ${p12(customerEmail, B.TEXT)}
     ${spacer(10)}
-    ${detail12(customerPhone, B.TEXT)}
-  `);
+    ${p12(customerPhone, B.TEXT)}
+    ${spacer(34)}
+  `, "", CARD_MIN_H);
 
   /* Default address (remove duplicate name line) */
   let addressLines = (shippingText || "-")
@@ -566,12 +540,12 @@ function buildOrderEmailLayout(data = {}) {
   }
 
   const addressBox = box(`
-    ${title16("Default address")}
+    ${h16("Default address")}
     ${spacer(8)}
-    ${detail12(customerName, B.TEXT)}
+    ${p12(customerName, B.TEXT)}
     ${spacer(10)}
 
-    <div style="font-family:${B.FONT}; font-size:12px; font-weight:400; line-height:1.55; color:${B.SUBTLE};">
+    <div style="font-family:${B.FONT}; font-size:12px; font-weight:400; line-height:1.6; color:${B.SUBTLE};">
       ${addressLines.length ? addressLines.map((l) => `${esc(l)}<br>`).join("") : esc("-")}
     </div>
 
@@ -595,13 +569,17 @@ function buildOrderEmailLayout(data = {}) {
       `
         : ""
     }
-  `);
+  `, "", CARD_MIN_H);
 
-  /* Items box */
+  /* Items block (like your screenshot) */
   const itemsBox = box(`
-    ${sectionTitle("Items")}
-    ${orderItemsTableScreenshot(items)}
-    ${noteLine(`Items marked as <span style="font-weight:600;color:${B.TEXT};">Back order</span> are currently unavailable and will be supplied when stock is available.`)}
+    ${h16("Items")}
+    ${spacer(10)}
+    <div style="border:1px solid ${B.LINE};">
+      ${orderItemsTableScreenshot(items)}
+    </div>
+    ${spacer(12)}
+    ${p12("Items marked as Back order are currently unavailable and will be supplied when stock is available.", B.SUBTLE)}
   `);
 
   return `
