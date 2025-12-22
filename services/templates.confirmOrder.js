@@ -1,20 +1,32 @@
 // services/templates.confirmOrder.js
-// ✅ Sugarlean typography cleanup (consistent hierarchy + tidy spacing)
+// ✅ Sugarlean clean + tidy email restyle
+// ✅ Wider wrapper (default 760px) + responsive
+// ✅ Softer borders, real card look, consistent typography
 // ✅ Table: REF | PRODUCT | BOXES | STATUS (NO thumbnails)
 
 const { BRAND, SITE_URL, LOGO_URL } = require("./templates");
 
-/* ---------- safe fallbacks (in case BRAND is missing fields) ---------- */
+/* ---------- safe fallbacks ---------- */
 const B = {
-  WIDTH: (BRAND && BRAND.WIDTH) || 640,
+  // ✅ wider overall email
+  WIDTH: (BRAND && BRAND.WIDTH) || 760,
+
   BG: (BRAND && BRAND.BG) || "#F3F4F6",
   CARD: (BRAND && BRAND.CARD) || "#FFFFFF",
+
+  // text
   TEXT: (BRAND && BRAND.TEXT) || "#111111",
   SUBTLE: (BRAND && BRAND.SUBTLE) || "#6B7280",
-  BORDER: (BRAND && BRAND.BORDER) || "#111111",
   BLACK: (BRAND && BRAND.BLACK) || "#0B0B0B",
   YELLOW: (BRAND && BRAND.YELLOW) || "#F5C542",
+
+  // ✅ softer lines (don’t use thick black borders)
+  LINE: (BRAND && BRAND.LINE) || "rgba(17,17,17,.12)",
+  LINE_STRONG: (BRAND && BRAND.LINE_STRONG) || "rgba(17,17,17,.18)",
+
+  // radius
   RADIUS: (BRAND && BRAND.RADIUS) || 18,
+  CARD_RADIUS: (BRAND && BRAND.CARD_RADIUS) || 16,
 
   // Typography tokens (Sugarlean feel)
   FONT: `'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif`,
@@ -90,7 +102,7 @@ const pill = (text, tone = "ok") => {
   const isBad = tone === "bad";
   const bg = isBad ? "#FEECEC" : "#EAF7EE";
   const fg = isBad ? "#8A0F0F" : "#1C6B38";
-  const bd = isBad ? "rgba(220,38,38,.35)" : "rgba(22,163,74,.30)";
+  const bd = isBad ? "rgba(220,38,38,.30)" : "rgba(22,163,74,.26)";
   return `
     <span style="
       display:inline-block;
@@ -109,11 +121,14 @@ const pill = (text, tone = "ok") => {
   `;
 };
 
+/* ✅ clean card box */
 const box = (innerHTML, extraStyle = "") => `
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="
-    border:1px solid ${B.BORDER};
+    border:1px solid ${B.LINE};
     background:${B.CARD};
-    border-radius:0;
+    border-radius:${B.CARD_RADIUS}px;
+    border-collapse:separate;
+    box-shadow:0 2px 10px rgba(17,17,17,.06);
     ${extraStyle}
   ">
     <tr>
@@ -124,7 +139,7 @@ const box = (innerHTML, extraStyle = "") => `
   </table>
 `;
 
-/* ✅ Sugarlean typography primitives */
+/* ✅ typography primitives */
 const kicker = (txt) => `
   <div style="
     font-family:${B.FONT};
@@ -133,7 +148,7 @@ const kicker = (txt) => `
     letter-spacing:${B.TRACK_WIDE};
     text-transform:uppercase;
     color:${B.TEXT};
-    margin:0 0 8px 0;
+    margin:0 0 10px 0;
   ">${esc(txt)}</div>
 `;
 
@@ -142,7 +157,7 @@ const bodyText = (txt) => `
     font-family:${B.FONT};
     font-size:14px;
     font-weight:400;
-    line-height:1.65;
+    line-height:1.7;
     color:${B.SUBTLE};
     margin:0;
   ">${esc(txt)}</div>
@@ -164,7 +179,7 @@ const line = (txt) => `
     font-family:${B.FONT};
     font-size:14px;
     font-weight:500;
-    line-height:1.5;
+    line-height:1.6;
     color:${B.TEXT};
     margin:0;
   ">${esc(txt)}</div>
@@ -184,15 +199,14 @@ const metaSmall = (txt) => `
 const bigLabel = (txt) => `
   <div style="
     font-family:${B.FONT};
-    font-size:26px;
-    font-weight:500;
+    font-size:22px;
+    font-weight:600;
     letter-spacing:-0.01em;
     color:${B.TEXT};
     margin:0;
   ">${esc(txt)}</div>
 `;
 
-/* ✅ UPDATED: smaller premium number */
 const bigNumber = (txt) => `
   <div style="
     font-family:${B.FONT};
@@ -212,8 +226,7 @@ const rightRow = (k, v, bold = false) => `
       font-size:12px;
       font-weight:900;
       letter-spacing:${B.TRACK};
-      text-transform:none;
-      color:${B.TEXT};
+      color:${B.SUBTLE};
       margin:0 0 4px 0;
     ">${esc(k)}</div>
     <div style="
@@ -250,12 +263,12 @@ function orderItemsTableScreenshot(items = []) {
 
   const th = (txt, align = "left", widthPx = null) => `
     <th style="
-      padding:14px 16px;
-      background:#EFEFEF;
-      border-bottom:1px solid ${B.BORDER};
+      padding:12px 14px;
+      background:#F6F6F6;
+      border-bottom:1px solid ${B.LINE};
       text-align:${align};
       font-family:${B.FONT};
-      font-size:13px;
+      font-size:12px;
       font-weight:900;
       letter-spacing:${B.TRACK_WIDE};
       text-transform:uppercase;
@@ -267,12 +280,14 @@ function orderItemsTableScreenshot(items = []) {
 
   const header = `
     <tr>
-      ${th("REF", "left", 120)}
+      ${th("REF", "left", 110)}
       ${th("PRODUCT", "left")}
-      ${th("BOXES", "center", 120)}
-      ${th("STATUS", "center", 160)}
+      ${th("BOXES", "center", 110)}
+      ${th("STATUS", "center", 150)}
     </tr>
   `;
+
+  const divider = `1px solid ${B.LINE}`;
 
   const rows = safeItems
     .map((it) => {
@@ -302,15 +317,21 @@ function orderItemsTableScreenshot(items = []) {
         statusRaw === "soldout";
 
       const statusText = isBackorder ? "Back order" : "In stock";
-      const divider = `1px solid rgba(17,17,17,.12)`;
 
       return `
         <tr>
-          <td style="padding:12px 16px;border-bottom:${divider};text-align:left;font-family:${B.FONT};font-size:14px;font-weight:800;color:${B.TEXT};white-space:nowrap;">
-            ${esc(ref)}
-          </td>
+          <td style="
+            padding:12px 14px;
+            border-bottom:${divider};
+            text-align:left;
+            font-family:${B.FONT};
+            font-size:14px;
+            font-weight:800;
+            color:${B.TEXT};
+            white-space:nowrap;
+          ">${esc(ref)}</td>
 
-          <td style="padding:12px 16px;border-bottom:${divider};text-align:left;">
+          <td style="padding:12px 14px;border-bottom:${divider};text-align:left;">
             <div style="font-family:${B.FONT};font-size:14px;font-weight:800;line-height:1.25;color:${B.TEXT};margin:0;">
               ${esc(title)}
             </div>
@@ -323,11 +344,17 @@ function orderItemsTableScreenshot(items = []) {
             }
           </td>
 
-          <td style="padding:12px 16px;border-bottom:${divider};text-align:center;font-family:${B.FONT};font-size:16px;font-weight:900;color:${B.TEXT};">
-            ${esc(String(qtyBoxes))}
-          </td>
+          <td style="
+            padding:12px 14px;
+            border-bottom:${divider};
+            text-align:center;
+            font-family:${B.FONT};
+            font-size:16px;
+            font-weight:900;
+            color:${B.TEXT};
+          ">${esc(String(qtyBoxes))}</td>
 
-          <td style="padding:12px 16px;border-bottom:${divider};text-align:center;">
+          <td style="padding:12px 14px;border-bottom:${divider};text-align:center;">
             ${isBackorder ? pill(statusText, "bad") : pill(statusText, "ok")}
           </td>
         </tr>
@@ -345,8 +372,11 @@ function orderItemsTableScreenshot(items = []) {
 
   return `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="
-      border-collapse:collapse;
-      border:1px solid ${B.BORDER};
+      border-collapse:separate;
+      border-spacing:0;
+      border:1px solid ${B.LINE};
+      border-radius:${B.CARD_RADIUS}px;
+      overflow:hidden;
       font-family:${B.FONT};
     ">
       ${header}
@@ -366,11 +396,12 @@ const base = ({ title, bodyHTML = "" }) => `
     <title>${esc(title)}</title>
 
     <style>
-      @media only screen and (max-width: 640px){
-        .wrap { width: 100% !important; }
+      @media only screen and (max-width: 740px){
+        .wrap { width: 100% !important; max-width: 100% !important; }
         .pad { padding-left: 12px !important; padding-right: 12px !important; }
         .col { display:block !important; width:100% !important; padding:0 !important; }
         .col + .col { padding-top:12px !important; }
+        .h1 { font-size: 28px !important; }
       }
     </style>
   </head>
@@ -399,31 +430,27 @@ const base = ({ title, bodyHTML = "" }) => `
                   letter-spacing:${B.TRACK_WIDE};
                   text-transform:uppercase;
                   color:${B.YELLOW};
-                ">
-                  WHOLESALE PORTAL
-                </div>
+                ">WHOLESALE PORTAL</div>
               </td>
             </tr>
 
             <!-- Title -->
             <tr>
-              <td style="background:${B.CARD};padding:18px 18px 12px 18px;text-align:center;">
-                <div style="
+              <td style="background:${B.CARD};padding:18px 22px 10px 22px;text-align:center;">
+                <div class="h1" style="
                   font-family:${B.FONT};
                   font-weight:900;
-                  font-size:34px;
+                  font-size:32px;
                   letter-spacing:-0.02em;
                   color:${B.TEXT};
                   line-height:1.12;
-                ">
-                  ${esc(title)}
-                </div>
+                ">${esc(title)}</div>
               </td>
             </tr>
 
             <!-- Body -->
             <tr>
-              <td style="background:${B.CARD};padding:10px 18px 18px 18px;">
+              <td style="background:${B.CARD};padding:10px 22px 22px 22px;">
                 ${bodyHTML}
               </td>
             </tr>
@@ -433,7 +460,7 @@ const base = ({ title, bodyHTML = "" }) => `
               <td style="
                 background:${B.CARD};
                 border-radius:0 0 ${B.RADIUS}px ${B.RADIUS}px;
-                padding:14px 16px 18px 16px;
+                padding:14px 16px 20px 16px;
                 text-align:center;
               ">
                 <div style="font-family:${B.FONT}; font-size:12px; line-height:1.6; color:${B.SUBTLE}; font-weight:500;">
@@ -491,38 +518,32 @@ function buildOrderEmailLayout(data = {}) {
   const mapsQ = encodeURIComponent((shippingText || "").replace(/\n/g, ", "));
   const mapsUrl = mapsQ ? `https://www.google.com/maps/search/?api=1&query=${mapsQ}` : "";
 
-  /* TOP BOX */
+  /* TOP CARD */
   const topLeft = `
     ${kicker("Wholesaler Order")}
     ${bodyText("Review your wholesale order summary below.")}
-    ${spacer(16)}
-
+    ${spacer(14)}
     ${bigLabel("Customer No.")}
     ${bigNumber(custNo || "-")}
   `;
 
   const topRight = `
-    ${rightRow("Order ID:", orderId, true)}
+    ${rightRow("Order ID", orderId, true)}
     ${rightRow("Wholesaler ABN Number", abn, true)}
-    ${rightRow("Submitted:", submitted || "-", false)}
+    ${rightRow("Submitted", submitted || "-", false)}
   `;
 
   const topBox = box(twoCol({ leftHTML: topLeft, rightHTML: topRight }));
 
-  /* Contact box */
+  /* Contact card */
   const contactBox = box(`
     ${kicker("Contact Information")}
-    <div style="height:4px;line-height:4px;font-size:4px;">&nbsp;</div>
-
     ${lineStrong(customerName)}
-    <div style="height:10px;line-height:10px;font-size:10px;">&nbsp;</div>
-
+    ${spacer(10)}
     ${line(customerEmail)}
-    <div style="height:10px;line-height:10px;font-size:10px;">&nbsp;</div>
-
+    ${spacer(8)}
     ${line(customerPhone)}
-    <div style="height:12px;line-height:12px;font-size:12px;">&nbsp;</div>
-
+    ${spacer(10)}
     ${metaSmall("Wholesaler ABN Number: " + (abn ? abn : "-")).replace(
       abn ? esc(abn) : "-",
       `<span style="font-weight:900;color:${B.TEXT};">${esc(abn || "-")}</span>`
@@ -541,22 +562,20 @@ function buildOrderEmailLayout(data = {}) {
 
   const addressBox = box(`
     ${kicker("Default Address")}
-    <div style="height:4px;line-height:4px;font-size:4px;">&nbsp;</div>
-
     ${lineStrong(customerName)}
-    <div style="height:10px;line-height:10px;font-size:10px;">&nbsp;</div>
+    ${spacer(10)}
 
-    <div style="font-family:${B.FONT}; font-size:14px; font-weight:500; line-height:1.7; color:${B.SUBTLE};">
+    <div style="font-family:${B.FONT}; font-size:14px; font-weight:500; line-height:1.75; color:${B.SUBTLE};">
       ${addressLines.length ? addressLines.map((l) => `${esc(l)}<br>`).join("") : esc("-")}
     </div>
 
     ${
       mapsUrl
         ? `
-        <div style="height:14px;line-height:14px;font-size:14px;">&nbsp;</div>
+        ${spacer(14)}
         <a href="${mapsUrl}" style="
           display:inline-block;
-          border:1px solid rgba(17,17,17,.35);
+          border:1px solid ${B.LINE_STRONG};
           border-radius:999px;
           padding:9px 14px;
           font-family:${B.FONT};
@@ -572,19 +591,11 @@ function buildOrderEmailLayout(data = {}) {
     }
   `);
 
-  /* Products table */
-  const productsBox = `
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="
-      border:1px solid ${B.BORDER};
-      background:${B.CARD};
-    ">
-      <tr>
-        <td style="padding:0;">
-          ${orderItemsTableScreenshot(items)}
-        </td>
-      </tr>
-    </table>
-  `;
+  /* Products table in its own clean card */
+  const productsBox = box(`
+    ${kicker("Order Items")}
+    ${orderItemsTableScreenshot(items)}
+  `);
 
   return `
     ${topBox}
