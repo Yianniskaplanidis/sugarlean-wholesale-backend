@@ -1,34 +1,31 @@
 // services/templates.confirmOrder.js
-// ✅ Sugarlean clean + tidy email restyle
+// ✅ Screenshot-style wording + minimal typography (like your image)
 // ✅ Wider wrapper (default 760px) + responsive
-// ✅ Softer borders, real card look, consistent typography
+// ✅ Thin borders + clean dividers (no shadows)
 // ✅ Table: REF | PRODUCT | BOXES | STATUS (NO thumbnails)
 
 const { BRAND, SITE_URL, LOGO_URL } = require("./templates");
 
 /* ---------- safe fallbacks ---------- */
 const B = {
-  // ✅ wider overall email
   WIDTH: (BRAND && BRAND.WIDTH) || 760,
 
   BG: (BRAND && BRAND.BG) || "#F3F4F6",
   CARD: (BRAND && BRAND.CARD) || "#FFFFFF",
 
-  // text
   TEXT: (BRAND && BRAND.TEXT) || "#111111",
   SUBTLE: (BRAND && BRAND.SUBTLE) || "#6B7280",
   BLACK: (BRAND && BRAND.BLACK) || "#0B0B0B",
   YELLOW: (BRAND && BRAND.YELLOW) || "#F5C542",
 
-  // ✅ softer lines (don’t use thick black borders)
-  LINE: (BRAND && BRAND.LINE) || "rgba(17,17,17,.12)",
-  LINE_STRONG: (BRAND && BRAND.LINE_STRONG) || "rgba(17,17,17,.18)",
+  // ✅ screenshot-like lines
+  LINE: (BRAND && BRAND.LINE) || "rgba(0,0,0,.10)",
+  LINE_STRONG: (BRAND && BRAND.LINE_STRONG) || "rgba(0,0,0,.28)",
 
-  // radius
+  // header radius only
   RADIUS: (BRAND && BRAND.RADIUS) || 18,
-  CARD_RADIUS: (BRAND && BRAND.CARD_RADIUS) || 16,
 
-  // Typography tokens (Sugarlean feel)
+  // Typography
   FONT: `'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif`,
   TRACK_WIDE: ".16em",
   TRACK: ".06em",
@@ -121,14 +118,13 @@ const pill = (text, tone = "ok") => {
   `;
 };
 
-/* ✅ clean card box */
+/* ✅ screenshot-style box (thin border, no shadow, square corners) */
 const box = (innerHTML, extraStyle = "") => `
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="
-    border:1px solid ${B.LINE};
+    border:1px solid ${B.LINE_STRONG};
     background:${B.CARD};
-    border-radius:${B.CARD_RADIUS}px;
-    border-collapse:separate;
-    box-shadow:0 2px 10px rgba(17,17,17,.06);
+    border-radius:0;
+    border-collapse:collapse;
     ${extraStyle}
   ">
     <tr>
@@ -139,36 +135,76 @@ const box = (innerHTML, extraStyle = "") => `
   </table>
 `;
 
-/* ✅ typography primitives */
+/* ✅ Screenshot-style typography */
 const kicker = (txt) => `
   <div style="
     font-family:${B.FONT};
-    font-size:12px;
-    font-weight:900;
-    letter-spacing:${B.TRACK_WIDE};
-    text-transform:uppercase;
+    font-size:16px;
+    font-weight:700;
     color:${B.TEXT};
-    margin:0 0 10px 0;
+    margin:0 0 2px 0;
   ">${esc(txt)}</div>
 `;
 
 const bodyText = (txt) => `
   <div style="
     font-family:${B.FONT};
-    font-size:14px;
+    font-size:13px;
     font-weight:400;
-    line-height:1.7;
-    color:${B.SUBTLE};
-    margin:0;
+    line-height:1.55;
+    color:${B.TEXT};
+    margin:0 0 10px 0;
   ">${esc(txt)}</div>
+`;
+
+const bigLabel = (txt) => `
+  <div style="
+    font-family:${B.FONT};
+    font-size:28px;
+    font-weight:500;
+    color:${B.TEXT};
+    margin:12px 0 6px 0;
+  ">${esc(txt)}</div>
+`;
+
+const bigNumber = (txt) => `
+  <div style="
+    font-family:${B.FONT};
+    font-size:22px;
+    font-weight:800;
+    letter-spacing:0;
+    color:${B.TEXT};
+    margin:0;
+    line-height:1.2;
+  ">${esc(txt)}</div>
+`;
+
+const rightRow = (k, v) => `
+  <div style="margin:0 0 12px 0;">
+    <div style="
+      font-family:${B.FONT};
+      font-size:13px;
+      font-weight:600;
+      color:${B.TEXT};
+      margin:0 0 2px 0;
+    ">${esc(k)}</div>
+    <div style="
+      font-family:${B.FONT};
+      font-size:14px;
+      font-weight:800;
+      color:${B.TEXT};
+      margin:0;
+      line-height:1.25;
+    ">${esc(v || "-")}</div>
+  </div>
 `;
 
 const lineStrong = (txt) => `
   <div style="
     font-family:${B.FONT};
-    font-size:14px;
+    font-size:13px;
     font-weight:800;
-    line-height:1.5;
+    line-height:1.4;
     color:${B.TEXT};
     margin:0;
   ">${esc(txt)}</div>
@@ -177,9 +213,9 @@ const lineStrong = (txt) => `
 const line = (txt) => `
   <div style="
     font-family:${B.FONT};
-    font-size:14px;
+    font-size:13px;
     font-weight:500;
-    line-height:1.6;
+    line-height:1.4;
     color:${B.TEXT};
     margin:0;
   ">${esc(txt)}</div>
@@ -189,56 +225,11 @@ const metaSmall = (txt) => `
   <div style="
     font-family:${B.FONT};
     font-size:12px;
-    font-weight:500;
-    line-height:1.55;
-    color:${B.SUBTLE};
+    font-weight:400;
+    line-height:1.45;
+    color:#777;
     margin:0;
   ">${esc(txt)}</div>
-`;
-
-const bigLabel = (txt) => `
-  <div style="
-    font-family:${B.FONT};
-    font-size:22px;
-    font-weight:600;
-    letter-spacing:-0.01em;
-    color:${B.TEXT};
-    margin:0;
-  ">${esc(txt)}</div>
-`;
-
-const bigNumber = (txt) => `
-  <div style="
-    font-family:${B.FONT};
-    font-size:34px;
-    font-weight:900;
-    letter-spacing:-0.02em;
-    color:${B.TEXT};
-    margin:10px 0 0 0;
-    line-height:1.06;
-  ">${esc(txt)}</div>
-`;
-
-const rightRow = (k, v, bold = false) => `
-  <div style="margin:0 0 12px 0;">
-    <div style="
-      font-family:${B.FONT};
-      font-size:12px;
-      font-weight:900;
-      letter-spacing:${B.TRACK};
-      color:${B.SUBTLE};
-      margin:0 0 4px 0;
-    ">${esc(k)}</div>
-    <div style="
-      font-family:${B.FONT};
-      font-size:${bold ? "18px" : "14px"};
-      font-weight:${bold ? "900" : "600"};
-      letter-spacing:${bold ? "-0.01em" : "0"};
-      color:${B.TEXT};
-      line-height:1.25;
-      margin:0;
-    ">${esc(v || "-")}</div>
-  </div>
 `;
 
 const twoCol = ({ leftHTML, rightHTML }) => `
@@ -264,17 +255,17 @@ function orderItemsTableScreenshot(items = []) {
   const th = (txt, align = "left", widthPx = null) => `
     <th style="
       padding:12px 14px;
-      background:#F6F6F6;
-      border-bottom:1px solid ${B.LINE};
+      background:#F3F3F3;
+      border-bottom:1px solid ${B.LINE_STRONG};
       text-align:${align};
       font-family:${B.FONT};
       font-size:12px;
-      font-weight:900;
-      letter-spacing:${B.TRACK_WIDE};
+      font-weight:800;
       text-transform:uppercase;
       ${widthPx ? `width:${widthPx}px;` : ""}
       white-space:nowrap;
       color:${B.TEXT};
+      letter-spacing:0.08em;
     ">${esc(txt)}</th>
   `;
 
@@ -325,19 +316,19 @@ function orderItemsTableScreenshot(items = []) {
             border-bottom:${divider};
             text-align:left;
             font-family:${B.FONT};
-            font-size:14px;
+            font-size:13px;
             font-weight:800;
             color:${B.TEXT};
             white-space:nowrap;
           ">${esc(ref)}</td>
 
           <td style="padding:12px 14px;border-bottom:${divider};text-align:left;">
-            <div style="font-family:${B.FONT};font-size:14px;font-weight:800;line-height:1.25;color:${B.TEXT};margin:0;">
+            <div style="font-family:${B.FONT};font-size:13px;font-weight:800;line-height:1.25;color:${B.TEXT};margin:0;">
               ${esc(title)}
             </div>
             ${
               barcode
-                ? `<div style="margin-top:4px;font-family:${B.FONT};font-size:12px;font-weight:500;line-height:1.4;color:${B.SUBTLE};">
+                ? `<div style="margin-top:4px;font-family:${B.FONT};font-size:12px;font-weight:400;line-height:1.35;color:#777;">
                     Barcode: ${esc(barcode)}
                   </div>`
                 : ""
@@ -349,8 +340,8 @@ function orderItemsTableScreenshot(items = []) {
             border-bottom:${divider};
             text-align:center;
             font-family:${B.FONT};
-            font-size:16px;
-            font-weight:900;
+            font-size:14px;
+            font-weight:800;
             color:${B.TEXT};
           ">${esc(String(qtyBoxes))}</td>
 
@@ -364,7 +355,7 @@ function orderItemsTableScreenshot(items = []) {
 
   const empty = `
     <tr>
-      <td colspan="4" style="padding:14px 16px;text-align:center;color:${B.SUBTLE};font-family:${B.FONT};font-size:14px;font-weight:500;line-height:1.6;">
+      <td colspan="4" style="padding:14px 16px;text-align:center;color:#777;font-family:${B.FONT};font-size:13px;font-weight:400;line-height:1.6;">
         No items found.
       </td>
     </tr>
@@ -372,11 +363,8 @@ function orderItemsTableScreenshot(items = []) {
 
   return `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="
-      border-collapse:separate;
-      border-spacing:0;
-      border:1px solid ${B.LINE};
-      border-radius:${B.CARD_RADIUS}px;
-      overflow:hidden;
+      border-collapse:collapse;
+      border:1px solid ${B.LINE_STRONG};
       font-family:${B.FONT};
     ">
       ${header}
@@ -401,7 +389,7 @@ const base = ({ title, bodyHTML = "" }) => `
         .pad { padding-left: 12px !important; padding-right: 12px !important; }
         .col { display:block !important; width:100% !important; padding:0 !important; }
         .col + .col { padding-top:12px !important; }
-        .h1 { font-size: 28px !important; }
+        .h1 { font-size: 26px !important; }
       }
     </style>
   </head>
@@ -418,12 +406,12 @@ const base = ({ title, bodyHTML = "" }) => `
               <td style="
                 background:${B.BLACK};
                 border-radius:${B.RADIUS}px ${B.RADIUS}px 0 0;
-                padding:28px 18px 16px 18px;
+                padding:22px 18px 14px 18px;
                 text-align:center;
               ">
                 <img src="${LOGO_URL}" alt="Sugarlean" width="155" style="display:inline-block;border:0;outline:none;text-decoration:none;">
                 <div style="
-                  margin-top:10px;
+                  margin-top:8px;
                   font-family:${B.FONT};
                   font-weight:900;
                   font-size:12px;
@@ -436,12 +424,12 @@ const base = ({ title, bodyHTML = "" }) => `
 
             <!-- Title -->
             <tr>
-              <td style="background:${B.CARD};padding:18px 22px 10px 22px;text-align:center;">
+              <td style="background:${B.CARD};padding:16px 22px 8px 22px;text-align:center;">
                 <div class="h1" style="
                   font-family:${B.FONT};
                   font-weight:900;
-                  font-size:32px;
-                  letter-spacing:-0.02em;
+                  font-size:30px;
+                  letter-spacing:-0.01em;
                   color:${B.TEXT};
                   line-height:1.12;
                 ">${esc(title)}</div>
@@ -463,7 +451,7 @@ const base = ({ title, bodyHTML = "" }) => `
                 padding:14px 16px 20px 16px;
                 text-align:center;
               ">
-                <div style="font-family:${B.FONT}; font-size:12px; line-height:1.6; color:${B.SUBTLE}; font-weight:500;">
+                <div style="font-family:${B.FONT}; font-size:12px; line-height:1.6; color:#777; font-weight:400;">
                   Sent automatically from
                   <a href="${SITE_URL}" style="color:${B.YELLOW};text-decoration:none;font-weight:800;">www.sugarlean.com.au</a>
                 </div>
@@ -518,35 +506,35 @@ function buildOrderEmailLayout(data = {}) {
   const mapsQ = encodeURIComponent((shippingText || "").replace(/\n/g, ", "));
   const mapsUrl = mapsQ ? `https://www.google.com/maps/search/?api=1&query=${mapsQ}` : "";
 
-  /* TOP CARD */
+  /* TOP BOX */
   const topLeft = `
     ${kicker("Wholesaler Order")}
     ${bodyText("Review your wholesale order summary below.")}
-    ${spacer(14)}
     ${bigLabel("Customer No.")}
     ${bigNumber(custNo || "-")}
   `;
 
   const topRight = `
-    ${rightRow("Order ID", orderId, true)}
-    ${rightRow("Wholesaler ABN Number", abn, true)}
-    ${rightRow("Submitted", submitted || "-", false)}
+    ${rightRow("Order ID:", orderId)}
+    ${rightRow("Wholesaler ABN Number", abn || "-")}
+    ${rightRow("Submitted:", submitted || "-")}
   `;
 
   const topBox = box(twoCol({ leftHTML: topLeft, rightHTML: topRight }));
 
-  /* Contact card */
+  /* Contact box */
   const contactBox = box(`
     ${kicker("Contact Information")}
+    ${spacer(6)}
     ${lineStrong(customerName)}
     ${spacer(10)}
     ${line(customerEmail)}
-    ${spacer(8)}
+    ${spacer(10)}
     ${line(customerPhone)}
     ${spacer(10)}
     ${metaSmall("Wholesaler ABN Number: " + (abn ? abn : "-")).replace(
       abn ? esc(abn) : "-",
-      `<span style="font-weight:900;color:${B.TEXT};">${esc(abn || "-")}</span>`
+      `<span style="font-weight:800;color:${B.TEXT};">${esc(abn || "-")}</span>`
     )}
   `);
 
@@ -561,11 +549,12 @@ function buildOrderEmailLayout(data = {}) {
   }
 
   const addressBox = box(`
-    ${kicker("Default Address")}
+    ${kicker("Default address")}
+    ${spacer(6)}
     ${lineStrong(customerName)}
     ${spacer(10)}
 
-    <div style="font-family:${B.FONT}; font-size:14px; font-weight:500; line-height:1.75; color:${B.SUBTLE};">
+    <div style="font-family:${B.FONT}; font-size:13px; font-weight:400; line-height:1.55; color:#777;">
       ${addressLines.length ? addressLines.map((l) => `${esc(l)}<br>`).join("") : esc("-")}
     </div>
 
@@ -579,9 +568,9 @@ function buildOrderEmailLayout(data = {}) {
           border-radius:999px;
           padding:9px 14px;
           font-family:${B.FONT};
-          font-size:13px;
-          font-weight:900;
-          letter-spacing:${B.TRACK};
+          font-size:12px;
+          font-weight:800;
+          letter-spacing:0.04em;
           color:${B.TEXT};
           text-decoration:none;
           background:#FFFFFF;
@@ -591,9 +580,8 @@ function buildOrderEmailLayout(data = {}) {
     }
   `);
 
-  /* Products table in its own clean card */
+  /* Products box */
   const productsBox = box(`
-    ${kicker("Order Items")}
     ${orderItemsTableScreenshot(items)}
   `);
 
