@@ -1,11 +1,9 @@
 // services/templates.confirmOrder.js
-// ✅ FINAL: matches your screenshot layout
-// - Black Sugarlean header + Wholesale Portal
-// - Title centered
-// - Content blocks: thin black border, no shadow, no radius
-// - Top block: "Wholesaler Order" + Customer No. (left) + Order/ABN/Submitted (right)
-// - Two blocks: Contact information + Default address (with button)
-// - Items block: title "Items" + table + note line
+// ✅ FINAL: matches your desired screenshot email style
+// ✅ Wider wrapper (760px) + responsive
+// ✅ Thin borders + clean dividers (no shadows)
+// ✅ Blocks: Top summary + 2 cards + Items card (with title + note)
+// ✅ Table: SKU / REF | PRODUCT | BOXES | STATUS (NO thumbnails)
 
 const { BRAND, SITE_URL, LOGO_URL } = require("./templates");
 
@@ -18,16 +16,17 @@ const B = {
 
   TEXT: (BRAND && BRAND.TEXT) || "#111111",
   SUBTLE: (BRAND && BRAND.SUBTLE) || "#6B7280",
-
   BLACK: (BRAND && BRAND.BLACK) || "#0B0B0B",
   YELLOW: (BRAND && BRAND.YELLOW) || "#F5C542",
 
-  // screenshot look: clean black line
-  BORDER: (BRAND && BRAND.BORDER) || "rgba(17,17,17,.55)",
-  SOFT_LINE: (BRAND && BRAND.SOFT_LINE) || "rgba(17,17,17,.10)",
+  // ✅ screenshot-like lines
+  LINE: (BRAND && BRAND.LINE) || "rgba(0,0,0,.10)",
+  LINE_STRONG: (BRAND && BRAND.LINE_STRONG) || "rgba(0,0,0,.28)",
 
+  // header radius only
   RADIUS: (BRAND && BRAND.RADIUS) || 18,
 
+  // Typography
   FONT: `'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif`,
   TRACK_WIDE: ".16em",
   TRACK: ".06em",
@@ -93,11 +92,10 @@ const fmtAddress = (addr) => {
   return parts.join("\n");
 };
 
-/* ---------- spacing ---------- */
+/* ---------- components ---------- */
 const spacer = (h = 12) =>
   `<div style="height:${h}px; line-height:${h}px; font-size:${h}px;">&nbsp;</div>`;
 
-/* ---------- components ---------- */
 const pill = (text, tone = "ok") => {
   const isBad = tone === "bad";
   const bg = isBad ? "#FEECEC" : "#EAF7EE";
@@ -106,14 +104,14 @@ const pill = (text, tone = "ok") => {
   return `
     <span style="
       display:inline-block;
-      padding:6px 14px;
+      padding:6px 12px;
       border-radius:999px;
       border:1px solid ${bd};
       background:${bg};
       color:${fg};
       font-family:${B.FONT};
-      font-size:12px;
-      font-weight:900;
+      font-size:11px;
+      font-weight:800;
       letter-spacing:${B.TRACK};
       text-transform:uppercase;
       white-space:nowrap;
@@ -121,10 +119,10 @@ const pill = (text, tone = "ok") => {
   `;
 };
 
-/* ✅ blocks like screenshot: thin border, no shadow, no radius */
+/* ✅ screenshot-style box (thin border, no shadow, square corners) */
 const box = (innerHTML, extraStyle = "") => `
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="
-    border:1px solid ${B.BORDER};
+    border:1px solid ${B.LINE_STRONG};
     background:${B.CARD};
     border-radius:0;
     border-collapse:collapse;
@@ -136,6 +134,124 @@ const box = (innerHTML, extraStyle = "") => `
       </td>
     </tr>
   </table>
+`;
+
+/* ✅ screenshot-style typography */
+const kicker = (txt) => `
+  <div style="
+    font-family:${B.FONT};
+    font-size:16px;
+    font-weight:700;
+    color:${B.TEXT};
+    margin:0 0 2px 0;
+  ">${esc(txt)}</div>
+`;
+
+const bodyText = (txt) => `
+  <div style="
+    font-family:${B.FONT};
+    font-size:13px;
+    font-weight:400;
+    line-height:1.55;
+    color:${B.TEXT};
+    margin:0 0 10px 0;
+  ">${esc(txt)}</div>
+`;
+
+const sectionTitle = (txt) => `
+  <div style="
+    font-family:${B.FONT};
+    font-size:18px;
+    font-weight:900;
+    color:${B.TEXT};
+    margin:0 0 12px 0;
+  ">${esc(txt)}</div>
+`;
+
+const bigLabel = (txt) => `
+  <div style="
+    font-family:${B.FONT};
+    font-size:28px;
+    font-weight:500;
+    color:${B.TEXT};
+    margin:12px 0 6px 0;
+  ">${esc(txt)}</div>
+`;
+
+const bigNumber = (txt) => `
+  <div style="
+    font-family:${B.FONT};
+    font-size:22px;
+    font-weight:800;
+    letter-spacing:0;
+    color:${B.TEXT};
+    margin:0;
+    line-height:1.2;
+  ">${esc(txt)}</div>
+`;
+
+const rightRow = (k, v) => `
+  <div style="margin:0 0 12px 0;">
+    <div style="
+      font-family:${B.FONT};
+      font-size:13px;
+      font-weight:600;
+      color:${B.TEXT};
+      margin:0 0 2px 0;
+    ">${esc(k)}</div>
+    <div style="
+      font-family:${B.FONT};
+      font-size:14px;
+      font-weight:800;
+      color:${B.TEXT};
+      margin:0;
+      line-height:1.25;
+    ">${esc(v || "-")}</div>
+  </div>
+`;
+
+const lineStrong = (txt) => `
+  <div style="
+    font-family:${B.FONT};
+    font-size:13px;
+    font-weight:800;
+    line-height:1.4;
+    color:${B.TEXT};
+    margin:0;
+  ">${esc(txt)}</div>
+`;
+
+const line = (txt) => `
+  <div style="
+    font-family:${B.FONT};
+    font-size:13px;
+    font-weight:500;
+    line-height:1.4;
+    color:${B.TEXT};
+    margin:0;
+  ">${esc(txt)}</div>
+`;
+
+const metaSmall = (txt) => `
+  <div style="
+    font-family:${B.FONT};
+    font-size:12px;
+    font-weight:400;
+    line-height:1.45;
+    color:#777;
+    margin:0;
+  ">${esc(txt)}</div>
+`;
+
+const noteLine = (html) => `
+  <div style="
+    margin-top:12px;
+    font-family:${B.FONT};
+    font-size:12px;
+    font-weight:400;
+    line-height:1.55;
+    color:#777;
+  ">${html}</div>
 `;
 
 const twoCol = ({ leftHTML, rightHTML }) => `
@@ -154,177 +270,38 @@ const twoCol = ({ leftHTML, rightHTML }) => `
   </table>
 `;
 
-/* ---------- typography (matches screenshot) ---------- */
-const hItems = (txt) => `
-  <div style="
-    font-family:${B.FONT};
-    font-size:20px;
-    font-weight:900;
-    color:${B.TEXT};
-    margin:0 0 12px 0;
-  ">${esc(txt)}</div>
-`;
-
-const topKicker = (txt) => `
-  <div style="
-    font-family:${B.FONT};
-    font-size:18px;
-    font-weight:600;
-    color:${B.TEXT};
-    margin:0 0 2px 0;
-  ">${esc(txt)}</div>
-`;
-
-const topSub = (txt) => `
-  <div style="
-    font-family:${B.FONT};
-    font-size:13px;
-    font-weight:400;
-    color:${B.TEXT};
-    margin:0;
-  ">${esc(txt)}</div>
-`;
-
-const customerLabel = (txt) => `
-  <div style="
-    font-family:${B.FONT};
-    font-size:26px;
-    font-weight:500;
-    color:${B.TEXT};
-    margin:18px 0 10px 0;
-  ">${esc(txt)}</div>
-`;
-
-const customerNumber = (txt) => `
-  <div style="
-    font-family:${B.FONT};
-    font-size:24px;
-    font-weight:900;
-    color:${B.TEXT};
-    margin:0;
-    letter-spacing:0.04em;
-  ">${esc(txt)}</div>
-`;
-
-const rightRow = (label, value) => `
-  <div style="margin:0 0 14px 0;">
-    <div style="
-      font-family:${B.FONT};
-      font-size:16px;
-      font-weight:500;
-      color:${B.TEXT};
-      margin:0 0 4px 0;
-    ">${esc(label)}</div>
-    <div style="
-      font-family:${B.FONT};
-      font-size:14px;
-      font-weight:900;
-      color:${B.TEXT};
-      margin:0;
-    ">${esc(value || "-")}</div>
-  </div>
-`;
-
-const cardTitle = (txt) => `
-  <div style="
-    font-family:${B.FONT};
-    font-size:16px;
-    font-weight:900;
-    color:${B.TEXT};
-    margin:0 0 14px 0;
-  ">${esc(txt)}</div>
-`;
-
-const cardStrong = (txt) => `
-  <div style="
-    font-family:${B.FONT};
-    font-size:14px;
-    font-weight:900;
-    color:${B.TEXT};
-    margin:0 0 10px 0;
-  ">${esc(txt)}</div>
-`;
-
-const cardLine = (txt) => `
-  <div style="
-    font-family:${B.FONT};
-    font-size:14px;
-    font-weight:500;
-    color:${B.TEXT};
-    margin:0 0 10px 0;
-  ">${esc(txt)}</div>
-`;
-
-const abnLine = (label, value) => `
-  <div style="
-    font-family:${B.FONT};
-    font-size:13px;
-    font-weight:500;
-    color:#7b7b7b;
-    margin:14px 0 0 0;
-  ">
-    ${esc(label)} <span style="font-weight:900;color:${B.TEXT};">${esc(value || "-")}</span>
-  </div>
-`;
-
-const addressBlock = (html) => `
-  <div style="
-    font-family:${B.FONT};
-    font-size:13px;
-    font-weight:500;
-    color:#7b7b7b;
-    line-height:1.55;
-    margin:0;
-  ">${html}</div>
-`;
-
-const mapButton = (txt, href) => `
-  <a href="${href}" style="
-    display:inline-block;
-    margin-top:14px;
-    border:1px solid rgba(17,17,17,.25);
-    border-radius:999px;
-    padding:10px 16px;
-    font-family:${B.FONT};
-    font-size:13px;
-    font-weight:900;
-    color:${B.TEXT};
-    text-decoration:none;
-    background:#fff;
-  ">${esc(txt)}</a>
-`;
-
-/* ---------- Items table (like screenshot) ---------- */
-function orderItemsTable(items = []) {
+/* ---------- items table (SKU/REF | PRODUCT | BOXES | STATUS) ---------- */
+function orderItemsTableScreenshot(items = []) {
   const safeItems = Array.isArray(items) ? items : [];
 
   const th = (txt, align = "left", widthPx = null) => `
     <th style="
       padding:14px 14px;
-      background:#F6F6F6;
-      border-bottom:1px solid ${B.SOFT_LINE};
+      background:#F7F7F7;
+      border-bottom:1px solid ${B.LINE};
+      border-right:1px solid ${B.LINE};
       text-align:${align};
       font-family:${B.FONT};
-      font-size:13px;
-      font-weight:900;
-      letter-spacing:0.08em;
+      font-size:12px;
+      font-weight:800;
       text-transform:uppercase;
       ${widthPx ? `width:${widthPx}px;` : ""}
       white-space:nowrap;
       color:${B.TEXT};
+      letter-spacing:0.08em;
     ">${esc(txt)}</th>
   `;
 
   const header = `
     <tr>
-      ${th("SKU / REF", "left", 140)}
+      ${th("SKU / REF", "left", 120)}
       ${th("PRODUCT", "left")}
-      ${th("BOXES", "center", 120)}
-      ${th("STATUS", "center", 140)}
+      ${th("BOXES", "center", 110)}
+      ${th("STATUS", "center", 130)}
     </tr>
   `;
 
-  const divider = `1px solid rgba(17,17,17,.06)`;
+  const divider = `1px solid ${B.LINE}`;
 
   const rows = safeItems
     .map((it) => {
@@ -357,26 +334,46 @@ function orderItemsTable(items = []) {
 
       return `
         <tr>
-          <td style="padding:14px 14px;border-bottom:${divider};text-align:left;font-family:${B.FONT};font-size:14px;font-weight:900;color:${B.TEXT};white-space:nowrap;">
-            ${esc(ref)}
-          </td>
+          <td style="
+            padding:14px 14px;
+            border-bottom:${divider};
+            border-right:${divider};
+            text-align:left;
+            font-family:${B.FONT};
+            font-size:13px;
+            font-weight:800;
+            color:${B.TEXT};
+            white-space:nowrap;
+          ">${esc(ref)}</td>
 
-          <td style="padding:14px 14px;border-bottom:${divider};text-align:left;">
-            <div style="font-family:${B.FONT};font-size:14px;font-weight:900;line-height:1.25;color:${B.TEXT};margin:0;">
+          <td style="
+            padding:14px 14px;
+            border-bottom:${divider};
+            border-right:${divider};
+            text-align:left;
+          ">
+            <div style="font-family:${B.FONT};font-size:13px;font-weight:800;line-height:1.25;color:${B.TEXT};margin:0;">
               ${esc(title)}
             </div>
             ${
               barcode
-                ? `<div style="margin-top:6px;font-family:${B.FONT};font-size:13px;font-weight:500;line-height:1.35;color:#7b7b7b;">
+                ? `<div style="margin-top:6px;font-family:${B.FONT};font-size:12px;font-weight:400;line-height:1.35;color:#777;">
                     Barcode: ${esc(barcode)}
                   </div>`
                 : ""
             }
           </td>
 
-          <td style="padding:14px 14px;border-bottom:${divider};text-align:center;font-family:${B.FONT};font-size:14px;font-weight:900;color:${B.TEXT};">
-            ${esc(String(qtyBoxes))}
-          </td>
+          <td style="
+            padding:14px 14px;
+            border-bottom:${divider};
+            border-right:${divider};
+            text-align:center;
+            font-family:${B.FONT};
+            font-size:13px;
+            font-weight:800;
+            color:${B.TEXT};
+          ">${esc(String(qtyBoxes))}</td>
 
           <td style="padding:14px 14px;border-bottom:${divider};text-align:center;">
             ${isBackorder ? pill(statusText, "bad") : pill(statusText, "ok")}
@@ -388,7 +385,7 @@ function orderItemsTable(items = []) {
 
   const empty = `
     <tr>
-      <td colspan="4" style="padding:14px 14px;text-align:center;color:#7b7b7b;font-family:${B.FONT};font-size:14px;font-weight:500;line-height:1.6;">
+      <td colspan="4" style="padding:14px 16px;text-align:center;color:#777;font-family:${B.FONT};font-size:13px;font-weight:400;line-height:1.6;">
         No items found.
       </td>
     </tr>
@@ -397,7 +394,7 @@ function orderItemsTable(items = []) {
   return `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="
       border-collapse:collapse;
-      border:1px solid rgba(17,17,17,.10);
+      border:1px solid ${B.LINE};
       font-family:${B.FONT};
       background:#fff;
     ">
@@ -423,7 +420,7 @@ const base = ({ title, bodyHTML = "" }) => `
         .pad { padding-left: 12px !important; padding-right: 12px !important; }
         .col { display:block !important; width:100% !important; padding:0 !important; }
         .col + .col { padding-top:12px !important; }
-        .title { font-size: 30px !important; }
+        .h1 { font-size: 26px !important; }
       }
     </style>
   </head>
@@ -440,12 +437,12 @@ const base = ({ title, bodyHTML = "" }) => `
               <td style="
                 background:${B.BLACK};
                 border-radius:${B.RADIUS}px ${B.RADIUS}px 0 0;
-                padding:26px 18px 16px 18px;
+                padding:22px 18px 14px 18px;
                 text-align:center;
               ">
                 <img src="${LOGO_URL}" alt="Sugarlean" width="155" style="display:inline-block;border:0;outline:none;text-decoration:none;">
                 <div style="
-                  margin-top:10px;
+                  margin-top:8px;
                   font-family:${B.FONT};
                   font-weight:900;
                   font-size:12px;
@@ -458,12 +455,12 @@ const base = ({ title, bodyHTML = "" }) => `
 
             <!-- Title -->
             <tr>
-              <td style="background:${B.CARD};padding:18px 22px 10px 22px;text-align:center;">
-                <div class="title" style="
+              <td style="background:${B.CARD};padding:16px 22px 8px 22px;text-align:center;">
+                <div class="h1" style="
                   font-family:${B.FONT};
                   font-weight:900;
-                  font-size:34px;
-                  letter-spacing:-0.02em;
+                  font-size:30px;
+                  letter-spacing:-0.01em;
                   color:${B.TEXT};
                   line-height:1.12;
                 ">${esc(title)}</div>
@@ -485,7 +482,7 @@ const base = ({ title, bodyHTML = "" }) => `
                 padding:14px 16px 20px 16px;
                 text-align:center;
               ">
-                <div style="font-family:${B.FONT}; font-size:12px; line-height:1.6; color:#7b7b7b; font-weight:500;">
+                <div style="font-family:${B.FONT}; font-size:12px; line-height:1.6; color:#777; font-weight:400;">
                   Sent automatically from
                   <a href="${SITE_URL}" style="color:${B.YELLOW};text-decoration:none;font-weight:800;">www.sugarlean.com.au</a>
                 </div>
@@ -540,12 +537,12 @@ function buildOrderEmailLayout(data = {}) {
   const mapsQ = encodeURIComponent((shippingText || "").replace(/\n/g, ", "));
   const mapsUrl = mapsQ ? `https://www.google.com/maps/search/?api=1&query=${mapsQ}` : "";
 
-  /* TOP BLOCK */
+  /* TOP BOX */
   const topLeft = `
-    ${topKicker("Wholesaler Order")}
-    ${topSub("Review your wholesale order summary below.")}
-    ${customerLabel("Customer No.")}
-    ${customerNumber(custNo || "-")}
+    ${kicker("Wholesaler Order")}
+    ${bodyText("Review your wholesale order summary below.")}
+    ${bigLabel("Customer No.")}
+    ${bigNumber(custNo || "-")}
   `;
 
   const topRight = `
@@ -558,11 +555,18 @@ function buildOrderEmailLayout(data = {}) {
 
   /* Contact box */
   const contactBox = box(`
-    ${cardTitle("Contact information")}
-    ${cardStrong(customerName)}
-    ${cardLine(customerEmail)}
-    ${cardLine(customerPhone)}
-    ${abnLine("Wholesaler ABN Number:", abn || "-")}
+    ${kicker("Contact information")}
+    ${spacer(6)}
+    ${lineStrong(customerName)}
+    ${spacer(10)}
+    ${line(customerEmail)}
+    ${spacer(10)}
+    ${line(customerPhone)}
+    ${spacer(10)}
+    ${metaSmall("Wholesaler ABN Number: " + (abn ? abn : "-")).replace(
+      abn ? esc(abn) : "-",
+      `<span style="font-weight:800;color:${B.TEXT};">${esc(abn || "-")}</span>`
+    )}
   `);
 
   /* Default address (remove duplicate name line) */
@@ -576,20 +580,44 @@ function buildOrderEmailLayout(data = {}) {
   }
 
   const addressBox = box(`
-    ${cardTitle("Default address")}
-    ${cardStrong(customerName)}
-    ${addressText(addressLines.length ? addressLines.map((l) => `${esc(l)}<br>`).join("") : esc("-"))}
-    ${mapsUrl ? mapButton("select on map", mapsUrl) : ""}
+    ${kicker("Default address")}
+    ${spacer(6)}
+    ${lineStrong(customerName)}
+    ${spacer(10)}
+
+    <div style="font-family:${B.FONT}; font-size:13px; font-weight:400; line-height:1.55; color:#777;">
+      ${addressLines.length ? addressLines.map((l) => `${esc(l)}<br>`).join("") : esc("-")}
+    </div>
+
+    ${
+      mapsUrl
+        ? `
+        ${spacer(14)}
+        <a href="${mapsUrl}" style="
+          display:inline-block;
+          border:1px solid ${B.LINE_STRONG};
+          border-radius:999px;
+          padding:9px 14px;
+          font-family:${B.FONT};
+          font-size:12px;
+          font-weight:800;
+          letter-spacing:0.04em;
+          color:${B.TEXT};
+          text-decoration:none;
+          background:#FFFFFF;
+        ">select on map</a>
+      `
+        : ""
+    }
   `);
 
-  /* ITEMS BLOCK */
+  /* ✅ ITEMS BOX (adds title + note like your screenshot) */
   const itemsBox = box(`
-    ${hItems("Items")}
-    ${orderItemsTable(items)}
-    ${spacer(12)}
-    <div style="font-family:${B.FONT}; font-size:13px; line-height:1.6; color:#7b7b7b; font-weight:500;">
-      Items marked as <span style="font-weight:900;color:${B.TEXT};">Back order</span> are currently unavailable and will be supplied when stock is available.
-    </div>
+    ${sectionTitle("Items")}
+    ${orderItemsTableScreenshot(items)}
+    ${noteLine(
+      `Items marked as <span style="font-weight:800;color:${B.TEXT};">Back order</span> are currently unavailable and will be supplied when stock is available.`
+    )}
   `);
 
   return `
