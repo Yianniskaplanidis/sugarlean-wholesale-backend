@@ -1,13 +1,15 @@
 // services/templates.confirmOrder.js
 // ✅ Screenshot-style layout
 // ✅ Contact + Default address combined into ONE block (2 columns inside)
-// ✅ Remove the big "Wholesale Order Summary" title row entirely
+// ✅ No big "Wholesale Order Summary" title row
 // ✅ Thin borders + clean dividers (no shadows)
 // ✅ Block headings: 16px / 500
 // ✅ Block details: 12px / 400 (no bold in blocks)
 // ✅ Submitted shows AU local time (Australia/Brisbane) — fallback to "now"
 // ✅ Items table: no outer outline, no vertical grid lines, tighter SKU/REF + BOXES, product title max 2 lines
 // ✅ Keep STATUS pill
+// ✅ NEW: Under "WHOLESALE PORTAL" add message "We’ve received your order..." (USER email only)
+// ✅ User subject: "Your order has been received — <orderId>"
 
 const { BRAND, SITE_URL, LOGO_URL } = require("./templates");
 
@@ -352,7 +354,8 @@ function orderItemsTableScreenshot(items = []) {
 }
 
 /* ---------- main email wrapper ---------- */
-const base = ({ bodyHTML = "" }) => `
+/* ✅ subtitle is optional (used for wholesaler email only) */
+const base = ({ bodyHTML = "", subtitle = "" }) => `
 <!doctype html>
 <html>
   <head>
@@ -367,7 +370,7 @@ const base = ({ bodyHTML = "" }) => `
         .pad { padding-left: 12px !important; padding-right: 12px !important; }
         .col { display:block !important; width:100% !important; padding:0 !important; }
         .col + .col { padding-top:12px !important; }
-        .vline { display:none !important; } /* hide divider on mobile */
+        .vline { display:none !important; }
       }
     </style>
   </head>
@@ -397,6 +400,19 @@ const base = ({ bodyHTML = "" }) => `
                   text-transform:uppercase;
                   color:${B.YELLOW};
                 ">WHOLESALE PORTAL</div>
+
+                ${
+                  subtitle
+                    ? `<div style="
+                        margin-top:10px;
+                        font-family:${B.FONT};
+                        font-size:12px;
+                        font-weight:400;
+                        line-height:1.6;
+                        color:rgba(255,255,255,.82);
+                      ">${esc(subtitle)}</div>`
+                    : ""
+                }
               </td>
             </tr>
 
@@ -444,7 +460,8 @@ function buildOrderEmailLayout(data = {}) {
   );
 
   const submittedRaw = data.submittedAt || data.submitted || data.createdAt || "";
-  const submitted = fmtDateTime(submittedRaw || new Date().toISOString()) || fmtDateTime(new Date().toISOString());
+  const submitted =
+    fmtDateTime(submittedRaw || new Date().toISOString()) || fmtDateTime(new Date().toISOString());
 
   const orderId = clean(data.orderId) || "No Order ID";
   const custNo =
@@ -484,7 +501,7 @@ function buildOrderEmailLayout(data = {}) {
 
   const topBox = box(twoCol({ leftHTML: topLeft, rightHTML: topRight }));
 
-  /* ✅ Combined Contact + Default address in ONE block (2 columns inside) */
+  /* ✅ Combined Contact + Default address (one block, 2 columns) */
   let addressLines = (shippingText || "-")
     .split("\n")
     .map((x) => clean(x))
@@ -539,7 +556,6 @@ function buildOrderEmailLayout(data = {}) {
           ${contactInner}
         </td>
 
-        <!-- vertical divider -->
         <td class="vline" valign="top" style="width:1px; background:${B.LINE}; font-size:0; line-height:0;">
           &nbsp;
         </td>
@@ -574,12 +590,15 @@ function buildOrderEmailLayout(data = {}) {
 /* ---------- templates ---------- */
 function confirmOrderAdminTemplate(data = {}) {
   const bodyHTML = buildOrderEmailLayout(data);
-  return base({ bodyHTML });
+  return base({ bodyHTML }); // no subtitle for admin
 }
 
 function confirmOrderUserTemplate(data = {}) {
   const bodyHTML = buildOrderEmailLayout(data);
-  return base({ bodyHTML });
+  return base({
+    bodyHTML,
+    subtitle: "We’ve received your order — we’ll review stock, packing and shipping and confirm shortly.",
+  });
 }
 
 /* ---------- exports expected by mailer.js ---------- */
@@ -596,8 +615,9 @@ function renderConfirmOrderAdminEmail(data = {}) {
 }
 
 function renderConfirmOrderUserEmail(data = {}) {
+  const orderId = data.orderId || "No Order ID";
   return {
-    subject: "Wholesale Order received [DO NOT REPLY]",
+    subject: `Your order has been received — ${orderId}`,
     html: confirmOrderUserTemplate(data),
   };
 }
