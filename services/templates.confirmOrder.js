@@ -6,10 +6,12 @@
 // ✅ Block headings: 16px / 500
 // ✅ Block details: 12px / 400 (no bold in blocks)
 // ✅ Submitted shows AU local time (Australia/Brisbane) — fallback to "now"
-// ✅ Items table: no outer outline, no vertical grid lines, tighter SKU/REF + BOXES, product title max 2 lines
-// ✅ Keep STATUS pill
-// ✅ Move "Thanks for your order..." into the top-left block to replace "Review your wholesale order summary below."
-// ✅ Remove subtitle under "WHOLESALE PORTAL" (USER email)
+// ✅ Items table: no outer outline, no vertical grid lines, tighter SKU/REF + BOXES,
+//    product title prefers 1 line (fallback clamps), STATUS pill kept
+// ✅ SKU/REF / BOXES / STATUS vertically centered
+// ✅ Message moved: "Thanks for your order..." replaces "Review your wholesale order summary below."
+// ✅ Footer contact uses orders@sugarlean.com.au (same mailbox as info@sugarlean.com.au)
+// ✅ Extra notes (optional) included if provided from your form payload
 // ✅ User subject: "Your order has been received — <orderId>"
 
 const { BRAND, SITE_URL, LOGO_URL } = require("./templates");
@@ -32,6 +34,9 @@ const B = {
   RADIUS: (BRAND && BRAND.RADIUS) || 18,
 
   FONT: `'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif`,
+
+  SUPPORT_EMAIL: (BRAND && BRAND.SUPPORT_EMAIL) || "orders@sugarlean.com.au",
+  SUPPORT_NOTE: (BRAND && BRAND.SUPPORT_NOTE) || "(same as info@sugarlean.com.au)",
 };
 
 /* ---------- helpers ---------- */
@@ -152,13 +157,13 @@ const box = (innerHTML, extraStyle = "", cellStyle = "") => `
 `;
 
 /* ✅ headings & details */
-const h16 = (txt) => `
+const h16 = (txt, mb = 10) => `
   <div style="
     font-family:${B.FONT};
     font-size:16px;
     font-weight:500;
     color:${B.TEXT};
-    margin:0 0 10px 0;
+    margin:0 0 ${mb}px 0;
   ">${esc(txt)}</div>
 `;
 
@@ -179,13 +184,13 @@ const topLeadTitle = (txt) => `
     font-size:18px;
     font-weight:600;
     color:${B.TEXT};
-    margin:0 0 4px 0;
+    margin:0 0 6px 0;
   ">${esc(txt)}</div>
 `;
 
 const rightRow = (k, v) => `
   <div style="margin:0 0 12px 0;">
-    ${h16(k)}
+    ${h16(k, 6)}
     ${p12(v || "-", B.TEXT)}
   </div>
 `;
@@ -210,9 +215,10 @@ const twoCol = ({ leftHTML, rightHTML }) => `
 function orderItemsTableScreenshot(items = []) {
   const safeItems = Array.isArray(items) ? items : [];
 
-  const COL_REF = 80;
-  const COL_BOX = 70;
-  const COL_STATUS = 130;
+  // tighter columns
+  const COL_REF = 64;
+  const COL_BOX = 56;
+  const COL_STATUS = 120;
 
   const th = (txt, align = "left", widthPx = null) => `
     <th style="
@@ -228,12 +234,13 @@ function orderItemsTableScreenshot(items = []) {
       color:${B.TEXT};
       ${widthPx ? `width:${widthPx}px;` : ""}
       white-space:nowrap;
+      vertical-align:middle;
     ">${esc(txt)}</th>
   `;
 
   const header = `
     <tr>
-      ${th("SKU / REF", "center", COL_REF)}
+      ${th("SKU / REF", "left", COL_REF)}
       ${th("PRODUCT", "left")}
       ${th("BOXES", "center", COL_BOX)}
       ${th("STATUS", "center", COL_STATUS)}
@@ -271,6 +278,7 @@ function orderItemsTableScreenshot(items = []) {
 
       const statusText = isBackorder ? "Back order" : "In stock";
 
+      // Prefer ONE line; if client doesn’t support line-clamp, it will naturally wrap.
       const titleHTML = `
         <div style="
           font-family:${B.FONT};
@@ -279,11 +287,13 @@ function orderItemsTableScreenshot(items = []) {
           line-height:1.35;
           color:${B.TEXT};
           margin:0;
-          display:-webkit-box;
-          -webkit-line-clamp:2;
-          -webkit-box-orient:vertical;
+          white-space:nowrap;
           overflow:hidden;
-          word-break:break-word;
+          text-overflow:ellipsis;
+
+          display:-webkit-box;
+          -webkit-line-clamp:1;
+          -webkit-box-orient:vertical;
         ">${esc(title)}</div>
       `;
 
@@ -298,16 +308,21 @@ function orderItemsTableScreenshot(items = []) {
           <td style="
             padding:14px 12px;
             border-bottom:${rowDivider};
-            text-align:center;
-            vertical-align:middle;
+            text-align:left;
             font-family:${B.FONT};
             font-size:12px;
             font-weight:400;
             color:${B.TEXT};
             white-space:nowrap;
+            vertical-align:middle;
           ">${esc(ref)}</td>
 
-          <td style="padding:14px 12px;border-bottom:${rowDivider};text-align:left;vertical-align:middle;">
+          <td style="
+            padding:14px 12px;
+            border-bottom:${rowDivider};
+            text-align:left;
+            vertical-align:middle;
+          ">
             ${titleHTML}
             ${barcodeHTML}
           </td>
@@ -316,20 +331,20 @@ function orderItemsTableScreenshot(items = []) {
             padding:14px 12px;
             border-bottom:${rowDivider};
             text-align:center;
-            vertical-align:middle;
             font-family:${B.FONT};
             font-size:12px;
             font-weight:400;
             color:${B.TEXT};
             white-space:nowrap;
+            vertical-align:middle;
           ">${esc(String(qtyBoxes))}</td>
 
           <td style="
             padding:14px 12px;
             border-bottom:${rowDivider};
             text-align:center;
-            vertical-align:middle;
             white-space:nowrap;
+            vertical-align:middle;
           ">
             ${isBackorder ? pill(statusText, "bad") : pill(statusText, "ok")}
           </td>
@@ -358,8 +373,7 @@ function orderItemsTableScreenshot(items = []) {
 }
 
 /* ---------- main email wrapper ---------- */
-/* ✅ subtitle is optional (we now keep it empty for user; message is inside top-left block) */
-const base = ({ bodyHTML = "", subtitle = "" }) => `
+const base = ({ bodyHTML = "" }) => `
 <!doctype html>
 <html>
   <head>
@@ -404,19 +418,6 @@ const base = ({ bodyHTML = "", subtitle = "" }) => `
                   text-transform:uppercase;
                   color:${B.YELLOW};
                 ">WHOLESALE PORTAL</div>
-
-                ${
-                  subtitle
-                    ? `<div style="
-                        margin-top:10px;
-                        font-family:${B.FONT};
-                        font-size:12px;
-                        font-weight:400;
-                        line-height:1.6;
-                        color:rgba(255,255,255,.82);
-                      ">${esc(subtitle)}</div>`
-                    : ""
-                }
               </td>
             </tr>
 
@@ -436,9 +437,18 @@ const base = ({ bodyHTML = "", subtitle = "" }) => `
                 text-align:center;
               ">
                 <div style="font-family:${B.FONT}; font-size:12px; line-height:1.6; color:${B.SUBTLE}; font-weight:400;">
+                  Questions? Email
+                  <a href="mailto:${esc(B.SUPPORT_EMAIL)}" style="color:${B.YELLOW};text-decoration:none;font-weight:700;">${esc(
+                    B.SUPPORT_EMAIL
+                  )}</a>
+                  <span style="color:${B.SUBTLE};"> ${esc(B.SUPPORT_NOTE)}</span>
+                </div>
+
+                <div style="margin-top:8px;font-family:${B.FONT}; font-size:12px; line-height:1.6; color:${B.SUBTLE}; font-weight:400;">
                   Sent automatically from
                   <a href="${SITE_URL}" style="color:${B.YELLOW};text-decoration:none;font-weight:700;">www.sugarlean.com.au</a>
                 </div>
+
                 <div style="margin-top:6px;font-family:${B.FONT}; font-size:12px; line-height:1.6; color:${B.TEXT}; font-weight:400;">
                   © ${new Date().getFullYear()} SUGARLEAN PTY LTD
                 </div>
@@ -485,15 +495,27 @@ function buildOrderEmailLayout(data = {}) {
   const customerEmail = clean(c.email) || "-";
   const customerPhone = clean(c.phone) || "-";
 
+  // ✅ extra notes from your textarea (support many possible keys)
+  const extraNotes =
+    clean(data.extraNotes) ||
+    clean(data.extra_notes) ||
+    clean(data.notes) ||
+    clean(data.note) ||
+    clean(c.extraNotes) ||
+    "";
+
   const mapsQ = encodeURIComponent((shippingText || "").replace(/\n/g, ", "));
   const mapsUrl = mapsQ ? `https://www.google.com/maps/search/?api=1&query=${mapsQ}` : "";
 
   /* TOP BOX */
   const topLeft = `
     ${topLeadTitle("Wholesaler Order")}
-    ${p12("Thanks for your order! We’re now reviewing stock, packing, and shipping and will be in touch shortly.", B.TEXT)}
+    ${p12(
+      "Thanks for your order! We’re now reviewing stock, packing, and shipping and will be in touch shortly.",
+      B.TEXT
+    )}
     ${spacer(10)}
-    ${h16("Customer No.")}
+    ${h16("Customer No.", 6)}
     ${p12(custNo, B.TEXT)}
   `;
 
@@ -553,18 +575,21 @@ function buildOrderEmailLayout(data = {}) {
     }
   `;
 
+  // ✅ make both columns same height (email-safe): use a fixed minimum height on the TDs
+  const minColHeight = "210px";
+
   const contactAddressBox = box(`
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
       <tr>
-        <td valign="top" style="width:50%; padding-right:14px;">
+        <td valign="top" style="width:50%; padding-right:14px; height:${minColHeight};">
           ${contactInner}
         </td>
 
-        <td class="vline" valign="top" style="width:1px; background:${B.LINE}; font-size:0; line-height:0;">
+        <td class="vline" valign="top" style="width:1px; background:${B.LINE}; font-size:0; line-height:0; height:${minColHeight};">
           &nbsp;
         </td>
 
-        <td valign="top" style="width:50%; padding-left:14px;">
+        <td valign="top" style="width:50%; padding-left:14px; height:${minColHeight};">
           ${addressInner}
         </td>
       </tr>
@@ -578,6 +603,17 @@ function buildOrderEmailLayout(data = {}) {
     <div style="border:1px solid ${B.LINE};">
       ${orderItemsTableScreenshot(items)}
     </div>
+
+    ${
+      extraNotes
+        ? `
+        ${spacer(14)}
+        ${h16("Extra notes", 6)}
+        ${p12(extraNotes, B.SUBTLE)}
+      `
+        : ""
+    }
+
     ${spacer(12)}
     ${p12("Items marked as Back order are currently unavailable and will be supplied when stock is available.", B.SUBTLE)}
   `);
@@ -594,12 +630,12 @@ function buildOrderEmailLayout(data = {}) {
 /* ---------- templates ---------- */
 function confirmOrderAdminTemplate(data = {}) {
   const bodyHTML = buildOrderEmailLayout(data);
-  return base({ bodyHTML }); // no subtitle for admin
+  return base({ bodyHTML });
 }
 
 function confirmOrderUserTemplate(data = {}) {
   const bodyHTML = buildOrderEmailLayout(data);
-  return base({ bodyHTML, subtitle: "" }); // ✅ removed subtitle under WHOLESALE PORTAL
+  return base({ bodyHTML });
 }
 
 /* ---------- exports expected by mailer.js ---------- */
