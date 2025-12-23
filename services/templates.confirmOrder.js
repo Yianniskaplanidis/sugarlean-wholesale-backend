@@ -6,10 +6,12 @@
 // ✅ Block headings: 16px / 500
 // ✅ Block details: 12px / 400 (no bold in blocks)
 // ✅ Submitted shows AU local time (Australia/Brisbane) — fallback to "now"
-// ✅ Items table: no outer outline, no vertical grid lines, tighter SKU/REF + BOXES, product title max 2 lines
+// ✅ Items table: no outer outline, no vertical grid lines, tighter SKU/REF + BOXES, product title prefers 1 line (falls back to 2)
 // ✅ Keep STATUS pill
-// ✅ NEW: Under "WHOLESALE PORTAL" add message "We’ve received your order..." (USER email only)
+// ✅ NEW: Under "WHOLESALE PORTAL" add message (USER email only)
 // ✅ User subject: "Your order has been received — <orderId>"
+// ✅ NEW: Show extra notes (if provided)
+// ✅ NEW: Footer contact email shown as orders@sugarlean.com.au (same mailbox as info@sugarlean.com.au)
 
 const { BRAND, SITE_URL, LOGO_URL } = require("./templates");
 
@@ -189,29 +191,14 @@ const rightRow = (k, v) => `
   </div>
 `;
 
-const twoCol = ({ leftHTML, rightHTML }) => `
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
-    <tr>
-      <!--[if mso]><td width="50%" valign="top"><![endif]-->
-      <td valign="top" style="width:50%; padding-right:12px;" class="col">
-        ${leftHTML}
-      </td>
-      <!--[if mso]></td><td width="50%" valign="top"><![endif]-->
-      <td valign="top" style="width:50%; padding-left:12px;" class="col">
-        ${rightHTML}
-      </td>
-      <!--[if mso]></td><![endif]-->
-    </tr>
-  </table>
-`;
-
 /* ---------- items table ---------- */
 function orderItemsTableScreenshot(items = []) {
   const safeItems = Array.isArray(items) ? items : [];
 
-  const COL_REF = 80;
-  const COL_BOX = 70;
-  const COL_STATUS = 130;
+  // tighter cols (SKU/REF + BOXES)
+  const COL_REF = 70;
+  const COL_BOX = 60;
+  const COL_STATUS = 120;
 
   const th = (txt, align = "left", widthPx = null) => `
     <th style="
@@ -270,6 +257,7 @@ function orderItemsTableScreenshot(items = []) {
 
       const statusText = isBackorder ? "Back order" : "In stock";
 
+      // Prefer 1 line on desktop; allow 2 lines if needed (email clients vary)
       const titleHTML = `
         <div style="
           font-family:${B.FONT};
@@ -278,12 +266,23 @@ function orderItemsTableScreenshot(items = []) {
           line-height:1.35;
           color:${B.TEXT};
           margin:0;
-          display:-webkit-box;
-          -webkit-line-clamp:2;
-          -webkit-box-orient:vertical;
+          white-space:nowrap;
           overflow:hidden;
-          word-break:break-word;
+          text-overflow:ellipsis;
+          max-width:420px;
         ">${esc(title)}</div>
+
+        <!--[if !mso]><!-- -->
+        <div style="
+          font-family:${B.FONT};
+          font-size:12px;
+          font-weight:500;
+          line-height:1.35;
+          color:${B.TEXT};
+          margin:0;
+          display:none;
+        ">${esc(title)}</div>
+        <!--<![endif]-->
       `;
 
       const barcodeHTML = barcode
@@ -368,9 +367,9 @@ const base = ({ bodyHTML = "", subtitle = "" }) => `
       @media only screen and (max-width: 740px){
         .wrap { width: 100% !important; max-width: 100% !important; }
         .pad { padding-left: 12px !important; padding-right: 12px !important; }
-        .col { display:block !important; width:100% !important; padding:0 !important; }
-        .col + .col { padding-top:12px !important; }
         .vline { display:none !important; }
+        .mobBreak { display:block !important; height:10px !important; }
+        .prodTitle { white-space:normal !important; }
       }
     </style>
   </head>
@@ -432,9 +431,15 @@ const base = ({ bodyHTML = "", subtitle = "" }) => `
                 text-align:center;
               ">
                 <div style="font-family:${B.FONT}; font-size:12px; line-height:1.6; color:${B.SUBTLE}; font-weight:400;">
+                  Questions? Email
+                  <a href="mailto:orders@sugarlean.com.au" style="color:${B.YELLOW};text-decoration:none;font-weight:700;">orders@sugarlean.com.au</a>
+                </div>
+
+                <div style="margin-top:6px;font-family:${B.FONT}; font-size:12px; line-height:1.6; color:${B.SUBTLE}; font-weight:400;">
                   Sent automatically from
                   <a href="${SITE_URL}" style="color:${B.YELLOW};text-decoration:none;font-weight:700;">www.sugarlean.com.au</a>
                 </div>
+
                 <div style="margin-top:6px;font-family:${B.FONT}; font-size:12px; line-height:1.6; color:${B.TEXT}; font-weight:400;">
                   © ${new Date().getFullYear()} SUGARLEAN PTY LTD
                 </div>
@@ -484,6 +489,17 @@ function buildOrderEmailLayout(data = {}) {
   const mapsQ = encodeURIComponent((shippingText || "").replace(/\n/g, ", "));
   const mapsUrl = mapsQ ? `https://www.google.com/maps/search/?api=1&query=${mapsQ}` : "";
 
+  // ✅ Extra notes (supports multiple possible keys)
+  const extraNotes =
+    clean(data.extraNotes) ||
+    clean(data.extra_notes) ||
+    clean(data.notes) ||
+    clean(data.note) ||
+    clean(data.message) ||
+    clean(data.customerNote) ||
+    clean((data.customer || {}).notes) ||
+    "";
+
   /* TOP BOX */
   const topLeft = `
     ${topLeadTitle("Wholesaler Order")}
@@ -499,7 +515,19 @@ function buildOrderEmailLayout(data = {}) {
     ${rightRow("Submitted:", submitted)}
   `;
 
-  const topBox = box(twoCol({ leftHTML: topLeft, rightHTML: topRight }));
+  const topBox = box(`
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+      <tr>
+        <td valign="top" style="width:50%; padding-right:12px;" class="col">
+          ${topLeft}
+        </td>
+
+        <td valign="top" style="width:50%; padding-left:12px;" class="col">
+          ${topRight}
+        </td>
+      </tr>
+    </table>
+  `);
 
   /* ✅ Combined Contact + Default address (one block, 2 columns) */
   let addressLines = (shippingText || "-")
@@ -549,6 +577,7 @@ function buildOrderEmailLayout(data = {}) {
     }
   `;
 
+  // ✅ Make both columns equal height (table-cells are same height naturally)
   const contactAddressBox = box(`
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
       <tr>
@@ -567,6 +596,23 @@ function buildOrderEmailLayout(data = {}) {
     </table>
   `);
 
+  /* Extra notes block (only if provided) */
+  const notesBox = extraNotes
+    ? box(`
+        ${h16("Extra notes")}
+        <div style="
+          font-family:${B.FONT};
+          font-size:12px;
+          font-weight:400;
+          line-height:1.6;
+          color:${B.SUBTLE};
+          white-space:pre-wrap;
+          word-break:break-word;
+          margin:0;
+        ">${esc(extraNotes)}</div>
+      `)
+    : "";
+
   /* Items block */
   const itemsBox = box(`
     ${h16("Items")}
@@ -582,6 +628,7 @@ function buildOrderEmailLayout(data = {}) {
     ${topBox}
     ${spacer(14)}
     ${contactAddressBox}
+    ${notesBox ? spacer(14) + notesBox : ""}
     ${spacer(14)}
     ${itemsBox}
   `;
