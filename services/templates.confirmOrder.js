@@ -597,7 +597,7 @@ function confirmOrderUserTemplate(data = {}) {
   const bodyHTML = buildOrderEmailLayout(data);
   return base({
     bodyHTML,
-    subtitle: "We’ve received your order — we’ll review stock, packing and shipping and confirm shortly.",
+    subtitle: "Thanks for your order! We’re now reviewing stock, packing, and shipping and will be in touch shortly.",
   });
 }
 
