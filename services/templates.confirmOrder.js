@@ -6,12 +6,11 @@
 // ✅ Block headings: 16px / 500
 // ✅ Block details: 12px / 400 (no bold in blocks)
 // ✅ Submitted shows AU local time (Australia/Brisbane) — fallback to "now"
-// ✅ Items table: no outer outline, no vertical grid lines, tighter SKU/REF + BOXES, product title prefers 1 line (falls back to 2)
+// ✅ Items table: no outer outline, no vertical grid lines, tighter SKU/REF + BOXES, product title max 2 lines
 // ✅ Keep STATUS pill
-// ✅ NEW: Under "WHOLESALE PORTAL" add message (USER email only)
+// ✅ Move "Thanks for your order..." into the top-left block to replace "Review your wholesale order summary below."
+// ✅ Remove subtitle under "WHOLESALE PORTAL" (USER email)
 // ✅ User subject: "Your order has been received — <orderId>"
-// ✅ NEW: Show extra notes (if provided)
-// ✅ NEW: Footer contact email shown as orders@sugarlean.com.au (same mailbox as info@sugarlean.com.au)
 
 const { BRAND, SITE_URL, LOGO_URL } = require("./templates");
 
@@ -191,14 +190,29 @@ const rightRow = (k, v) => `
   </div>
 `;
 
+const twoCol = ({ leftHTML, rightHTML }) => `
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+    <tr>
+      <!--[if mso]><td width="50%" valign="top"><![endif]-->
+      <td valign="top" style="width:50%; padding-right:12px;" class="col">
+        ${leftHTML}
+      </td>
+      <!--[if mso]></td><td width="50%" valign="top"><![endif]-->
+      <td valign="top" style="width:50%; padding-left:12px;" class="col">
+        ${rightHTML}
+      </td>
+      <!--[if mso]></td><![endif]-->
+    </tr>
+  </table>
+`;
+
 /* ---------- items table ---------- */
 function orderItemsTableScreenshot(items = []) {
   const safeItems = Array.isArray(items) ? items : [];
 
-  // tighter cols (SKU/REF + BOXES)
-  const COL_REF = 70;
-  const COL_BOX = 60;
-  const COL_STATUS = 120;
+  const COL_REF = 80;
+  const COL_BOX = 70;
+  const COL_STATUS = 130;
 
   const th = (txt, align = "left", widthPx = null) => `
     <th style="
@@ -219,7 +233,7 @@ function orderItemsTableScreenshot(items = []) {
 
   const header = `
     <tr>
-      ${th("SKU / REF", "left", COL_REF)}
+      ${th("SKU / REF", "center", COL_REF)}
       ${th("PRODUCT", "left")}
       ${th("BOXES", "center", COL_BOX)}
       ${th("STATUS", "center", COL_STATUS)}
@@ -257,7 +271,6 @@ function orderItemsTableScreenshot(items = []) {
 
       const statusText = isBackorder ? "Back order" : "In stock";
 
-      // Prefer 1 line on desktop; allow 2 lines if needed (email clients vary)
       const titleHTML = `
         <div style="
           font-family:${B.FONT};
@@ -266,23 +279,12 @@ function orderItemsTableScreenshot(items = []) {
           line-height:1.35;
           color:${B.TEXT};
           margin:0;
-          white-space:nowrap;
+          display:-webkit-box;
+          -webkit-line-clamp:2;
+          -webkit-box-orient:vertical;
           overflow:hidden;
-          text-overflow:ellipsis;
-          max-width:420px;
+          word-break:break-word;
         ">${esc(title)}</div>
-
-        <!--[if !mso]><!-- -->
-        <div style="
-          font-family:${B.FONT};
-          font-size:12px;
-          font-weight:500;
-          line-height:1.35;
-          color:${B.TEXT};
-          margin:0;
-          display:none;
-        ">${esc(title)}</div>
-        <!--<![endif]-->
       `;
 
       const barcodeHTML = barcode
@@ -296,7 +298,8 @@ function orderItemsTableScreenshot(items = []) {
           <td style="
             padding:14px 12px;
             border-bottom:${rowDivider};
-            text-align:left;
+            text-align:center;
+            vertical-align:middle;
             font-family:${B.FONT};
             font-size:12px;
             font-weight:400;
@@ -304,7 +307,7 @@ function orderItemsTableScreenshot(items = []) {
             white-space:nowrap;
           ">${esc(ref)}</td>
 
-          <td style="padding:14px 12px;border-bottom:${rowDivider};text-align:left;">
+          <td style="padding:14px 12px;border-bottom:${rowDivider};text-align:left;vertical-align:middle;">
             ${titleHTML}
             ${barcodeHTML}
           </td>
@@ -313,6 +316,7 @@ function orderItemsTableScreenshot(items = []) {
             padding:14px 12px;
             border-bottom:${rowDivider};
             text-align:center;
+            vertical-align:middle;
             font-family:${B.FONT};
             font-size:12px;
             font-weight:400;
@@ -324,6 +328,7 @@ function orderItemsTableScreenshot(items = []) {
             padding:14px 12px;
             border-bottom:${rowDivider};
             text-align:center;
+            vertical-align:middle;
             white-space:nowrap;
           ">
             ${isBackorder ? pill(statusText, "bad") : pill(statusText, "ok")}
@@ -353,7 +358,7 @@ function orderItemsTableScreenshot(items = []) {
 }
 
 /* ---------- main email wrapper ---------- */
-/* ✅ subtitle is optional (used for wholesaler email only) */
+/* ✅ subtitle is optional (we now keep it empty for user; message is inside top-left block) */
 const base = ({ bodyHTML = "", subtitle = "" }) => `
 <!doctype html>
 <html>
@@ -367,9 +372,9 @@ const base = ({ bodyHTML = "", subtitle = "" }) => `
       @media only screen and (max-width: 740px){
         .wrap { width: 100% !important; max-width: 100% !important; }
         .pad { padding-left: 12px !important; padding-right: 12px !important; }
+        .col { display:block !important; width:100% !important; padding:0 !important; }
+        .col + .col { padding-top:12px !important; }
         .vline { display:none !important; }
-        .mobBreak { display:block !important; height:10px !important; }
-        .prodTitle { white-space:normal !important; }
       }
     </style>
   </head>
@@ -431,15 +436,9 @@ const base = ({ bodyHTML = "", subtitle = "" }) => `
                 text-align:center;
               ">
                 <div style="font-family:${B.FONT}; font-size:12px; line-height:1.6; color:${B.SUBTLE}; font-weight:400;">
-                  Questions? Email
-                  <a href="mailto:orders@sugarlean.com.au" style="color:${B.YELLOW};text-decoration:none;font-weight:700;">orders@sugarlean.com.au</a>
-                </div>
-
-                <div style="margin-top:6px;font-family:${B.FONT}; font-size:12px; line-height:1.6; color:${B.SUBTLE}; font-weight:400;">
                   Sent automatically from
                   <a href="${SITE_URL}" style="color:${B.YELLOW};text-decoration:none;font-weight:700;">www.sugarlean.com.au</a>
                 </div>
-
                 <div style="margin-top:6px;font-family:${B.FONT}; font-size:12px; line-height:1.6; color:${B.TEXT}; font-weight:400;">
                   © ${new Date().getFullYear()} SUGARLEAN PTY LTD
                 </div>
@@ -489,21 +488,10 @@ function buildOrderEmailLayout(data = {}) {
   const mapsQ = encodeURIComponent((shippingText || "").replace(/\n/g, ", "));
   const mapsUrl = mapsQ ? `https://www.google.com/maps/search/?api=1&query=${mapsQ}` : "";
 
-  // ✅ Extra notes (supports multiple possible keys)
-  const extraNotes =
-    clean(data.extraNotes) ||
-    clean(data.extra_notes) ||
-    clean(data.notes) ||
-    clean(data.note) ||
-    clean(data.message) ||
-    clean(data.customerNote) ||
-    clean((data.customer || {}).notes) ||
-    "";
-
   /* TOP BOX */
   const topLeft = `
     ${topLeadTitle("Wholesaler Order")}
-    ${p12("Review your wholesale order summary below.", B.TEXT)}
+    ${p12("Thanks for your order! We’re now reviewing stock, packing, and shipping and will be in touch shortly.", B.TEXT)}
     ${spacer(10)}
     ${h16("Customer No.")}
     ${p12(custNo, B.TEXT)}
@@ -515,19 +503,7 @@ function buildOrderEmailLayout(data = {}) {
     ${rightRow("Submitted:", submitted)}
   `;
 
-  const topBox = box(`
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
-      <tr>
-        <td valign="top" style="width:50%; padding-right:12px;" class="col">
-          ${topLeft}
-        </td>
-
-        <td valign="top" style="width:50%; padding-left:12px;" class="col">
-          ${topRight}
-        </td>
-      </tr>
-    </table>
-  `);
+  const topBox = box(twoCol({ leftHTML: topLeft, rightHTML: topRight }));
 
   /* ✅ Combined Contact + Default address (one block, 2 columns) */
   let addressLines = (shippingText || "-")
@@ -577,7 +553,6 @@ function buildOrderEmailLayout(data = {}) {
     }
   `;
 
-  // ✅ Make both columns equal height (table-cells are same height naturally)
   const contactAddressBox = box(`
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
       <tr>
@@ -596,23 +571,6 @@ function buildOrderEmailLayout(data = {}) {
     </table>
   `);
 
-  /* Extra notes block (only if provided) */
-  const notesBox = extraNotes
-    ? box(`
-        ${h16("Extra notes")}
-        <div style="
-          font-family:${B.FONT};
-          font-size:12px;
-          font-weight:400;
-          line-height:1.6;
-          color:${B.SUBTLE};
-          white-space:pre-wrap;
-          word-break:break-word;
-          margin:0;
-        ">${esc(extraNotes)}</div>
-      `)
-    : "";
-
   /* Items block */
   const itemsBox = box(`
     ${h16("Items")}
@@ -628,7 +586,6 @@ function buildOrderEmailLayout(data = {}) {
     ${topBox}
     ${spacer(14)}
     ${contactAddressBox}
-    ${notesBox ? spacer(14) + notesBox : ""}
     ${spacer(14)}
     ${itemsBox}
   `;
@@ -642,10 +599,7 @@ function confirmOrderAdminTemplate(data = {}) {
 
 function confirmOrderUserTemplate(data = {}) {
   const bodyHTML = buildOrderEmailLayout(data);
-  return base({
-    bodyHTML,
-    subtitle: "Thanks for your order! We’re now reviewing stock, packing, and shipping and will be in touch shortly.",
-  });
+  return base({ bodyHTML, subtitle: "" }); // ✅ removed subtitle under WHOLESALE PORTAL
 }
 
 /* ---------- exports expected by mailer.js ---------- */
