@@ -13,9 +13,8 @@
 // ✅ User subject: "Your order has been received — <orderId>"
 // ✅ Include Extra notes in email
 // ✅ If no notes, show "None"
-// ✅ Include full Order Method UI in email
-// ✅ Highlights selected option
-// ✅ Shows rep map link when REP selected
+// ✅ Show only the selected order method in one clean block
+// ✅ Question + selected option + notes all together
 // ✅ Footer support email: orders@sugarlean.com.au
 
 const { BRAND, SITE_URL, LOGO_URL } = require("./templates");
@@ -80,20 +79,9 @@ const normalizeOrderMethod = (value = "") => {
 const orderMethodKey = (value = "") => {
   const v = clean(value).toLowerCase();
 
-  if (
-    v === "website" ||
-    v === "order direct through this website"
-  ) return "website";
-
-  if (
-    v === "rep" ||
-    v === "order with our rep"
-  ) return "rep";
-
-  if (
-    v === "metcash" ||
-    v === "order through metcash"
-  ) return "metcash";
+  if (v === "website" || v === "order direct through this website") return "website";
+  if (v === "rep" || v === "order with our rep") return "rep";
+  if (v === "metcash" || v === "order through metcash") return "metcash";
 
   return "";
 };
@@ -246,24 +234,18 @@ const twoCol = ({ leftHTML, rightHTML }) => `
   </table>
 `;
 
-function renderOrderMethodCard({
+function renderSelectedOrderMethodCard({
   title,
-  subtitle,
-  selected = false,
+  subtitle = "",
   extraHTML = "",
 }) {
-  const border = selected ? B.GREEN : "rgba(0,0,0,.08)";
-  const bg = "#FFFFFF";
-  const dotBorder = selected ? B.GREEN : "#B9BCC3";
-  const dotFill = selected ? B.GREEN : "transparent";
-
   return `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="
-      border:1px solid ${border};
+      border:1px solid ${B.GREEN};
       border-radius:16px;
       border-collapse:separate;
-      background:${bg};
-      margin:0 0 10px 0;
+      background:#FFFFFF;
+      margin:0;
     ">
       <tr>
         <td valign="top" style="padding:12px 14px;">
@@ -275,23 +257,18 @@ function renderOrderMethodCard({
                   width:14px;
                   height:14px;
                   border-radius:999px;
-                  border:1.8px solid ${dotBorder};
-                  background:${selected ? "#EAF7EE" : "#FFFFFF"};
+                  border:1.8px solid ${B.GREEN};
+                  background:#EAF7EE;
                   box-sizing:border-box;
-                  position:relative;
                 ">
-                  ${
-                    selected
-                      ? `<span style="
-                          display:block;
-                          width:8px;
-                          height:8px;
-                          border-radius:999px;
-                          background:${dotFill};
-                          margin:2px auto 0;
-                        "></span>`
-                      : ""
-                  }
+                  <span style="
+                    display:block;
+                    width:8px;
+                    height:8px;
+                    border-radius:999px;
+                    background:${B.GREEN};
+                    margin:2px auto 0;
+                  "></span>
                 </span>
               </td>
 
@@ -305,14 +282,18 @@ function renderOrderMethodCard({
                   margin:0;
                 ">${esc(title)}</div>
 
-                <div style="
-                  font-family:${B.FONT};
-                  font-size:12px;
-                  font-weight:400;
-                  line-height:1.6;
-                  color:${B.SUBTLE};
-                  margin:4px 0 0 0;
-                ">${esc(subtitle)}</div>
+                ${
+                  subtitle
+                    ? `<div style="
+                        font-family:${B.FONT};
+                        font-size:12px;
+                        font-weight:400;
+                        line-height:1.6;
+                        color:${B.SUBTLE};
+                        margin:4px 0 0 0;
+                      ">${esc(subtitle)}</div>`
+                    : ""
+                }
 
                 ${extraHTML || ""}
               </td>
@@ -324,56 +305,47 @@ function renderOrderMethodCard({
   `;
 }
 
-function renderOrderMethodSection(selectedKey = "", orderMethodLabel = "None") {
-  const websiteSelected = selectedKey === "website";
-  const repSelected = selectedKey === "rep";
-  const metcashSelected = selectedKey === "metcash";
+function renderOrderMethodSection(selectedKey = "", orderMethodLabel = "None", extraNotes = "None") {
+  let selectedTitle = "None";
+  let selectedSubtitle = "";
+  let extraHTML = "";
 
-  const noneNote =
-    !selectedKey && orderMethodLabel && clean(orderMethodLabel) !== "None"
-      ? `<div style="
+  if (selectedKey === "website") {
+    selectedTitle = "Order direct through this website";
+    selectedSubtitle = "Follows this site and sends your order through the wholesale portal.";
+  } else if (selectedKey === "rep") {
+    selectedTitle = "Order with our rep";
+    selectedSubtitle = "Circles back to the map of reps with phone numbers.";
+    extraHTML = `
+      <div style="margin-top:8px;">
+        <a href="${REP_MAP_URL}" target="_blank" rel="noopener noreferrer" style="
           font-family:${B.FONT};
           font-size:12px;
-          font-weight:400;
-          line-height:1.6;
-          color:${B.SUBTLE};
-          margin:0 0 10px 0;
-        ">Selected: ${esc(orderMethodLabel)}</div>`
-      : "";
+          font-weight:600;
+          line-height:1.4;
+          color:${B.TEXT};
+          text-decoration:underline;
+        ">View rep map</a>
+      </div>
+    `;
+  } else if (selectedKey === "metcash") {
+    selectedTitle = "Order through Metcash";
+    selectedSubtitle = "Choose this if the customer will order through Metcash instead.";
+  } else if (clean(orderMethodLabel) && clean(orderMethodLabel) !== "None") {
+    selectedTitle = clean(orderMethodLabel);
+    selectedSubtitle = "";
+  }
 
   return `
-    ${h16("How would you like to place your order?")}
-    ${noneNote}
-
-    ${renderOrderMethodCard({
-      title: "Order direct through this website",
-      subtitle: "Follows this site and sends your order through the wholesale portal.",
-      selected: websiteSelected,
+    ${h16("How would you like to place your order? *")}
+    ${renderSelectedOrderMethodCard({
+      title: selectedTitle,
+      subtitle: selectedSubtitle,
+      extraHTML
     })}
-
-    ${renderOrderMethodCard({
-      title: "Order with our rep",
-      subtitle: "Circles back to the map of reps with phone numbers.",
-      selected: repSelected,
-      extraHTML: `
-        <div style="margin-top:8px;">
-          <a href="${REP_MAP_URL}" target="_blank" rel="noopener noreferrer" style="
-            font-family:${B.FONT};
-            font-size:12px;
-            font-weight:600;
-            line-height:1.4;
-            color:${B.TEXT};
-            text-decoration:underline;
-          ">View rep map</a>
-        </div>
-      `,
-    })}
-
-    ${renderOrderMethodCard({
-      title: "Order through Metcash",
-      subtitle: "Choose this if the customer will order through Metcash instead.",
-      selected: metcashSelected,
-    })}
+    ${spacer(14)}
+    ${h16("Extra notes")}
+    ${p12(extraNotes || "None", B.SUBTLE)}
   `;
 }
 
@@ -704,11 +676,7 @@ function buildOrderEmailLayout(data = {}, opts = {}) {
     ${p12(custNo, B.TEXT)}
 
     ${spacer(14)}
-    ${renderOrderMethodSection(selectedOrderMethodKey, orderMethodLabel)}
-
-    ${spacer(14)}
-    ${h16("Extra notes")}
-    ${p12(extraNotes, B.SUBTLE)}
+    ${renderOrderMethodSection(selectedOrderMethodKey, orderMethodLabel, extraNotes)}
   `;
 
   const topRight = `
