@@ -11,7 +11,10 @@
 // ✅ "select on map" links to ADDRESS ONLY (not business/name) + reliable maps URL
 // ✅ Move “Thanks for your order...” into top-left lead line (replaces review text) for USER email
 // ✅ User subject: "Your order has been received — <orderId>"
-// ✅ Include Extra notes in email (if provided)
+// ✅ Include Extra notes in email
+// ✅ If no notes, show "None"
+// ✅ Include Order Method in email
+// ✅ If no order method, show "None"
 // ✅ Footer support email: orders@sugarlean.com.au
 
 const { BRAND, SITE_URL, LOGO_URL } = require("./templates");
@@ -60,6 +63,16 @@ const norm = (s) =>
     .replace(/\s+/g, " ");
 
 const hasDigit = (s) => /\d/.test(String(s || ""));
+
+const normalizeOrderMethod = (value = "") => {
+  const v = clean(value).toLowerCase();
+
+  if (v === "website") return "Order direct through this website";
+  if (v === "rep") return "Order with our rep";
+  if (v === "metcash") return "Order through Metcash";
+
+  return clean(value);
+};
 
 /* ✅ local AU time (QLD / GMT+10) */
 const fmtDateTime = (v) => {
@@ -415,7 +428,7 @@ const base = ({ bodyHTML = "" }) => `
               </td>
             </tr>
 
-            <!-- Body (no big title row) -->
+            <!-- Body -->
             <tr>
               <td style="background:${B.CARD};padding:18px 22px 22px 22px;">
                 ${bodyHTML}
@@ -462,13 +475,14 @@ function buildOrderEmailLayout(data = {}, opts = {}) {
     data.shippingAddress || c.shippingAddress || c.shipping_address || data.shipping_address || ""
   );
 
-  // ✅ notes (ensure it appears in email)
-  const extraNotes =
+  const rawExtraNotes =
     clean(data.extraNotes) ||
     clean(data.extra_notes) ||
     clean(data.notes) ||
     clean(c.notes) ||
     "";
+
+  const extraNotes = rawExtraNotes || "None";
 
   const submittedRaw = data.submittedAt || data.submitted || data.createdAt || "";
   const submitted =
@@ -488,11 +502,19 @@ function buildOrderEmailLayout(data = {}, opts = {}) {
     clean(c.abn_no) ||
     "-";
 
+  const orderMethodRaw =
+    clean(data.orderMethodLabel) ||
+    clean(data.order_method_label) ||
+    normalizeOrderMethod(data.orderMethod) ||
+    normalizeOrderMethod(data.order_method) ||
+    "";
+
+  const orderMethod = orderMethodRaw || "None";
+
   const customerName = clean(c.name) || "-";
   const customerEmail = clean(c.email) || "-";
   const customerPhone = clean(c.phone) || "-";
 
-  // ✅ remove duplicate name line from address block
   let addressLines = (shippingText || "-")
     .split("\n")
     .map((x) => clean(x))
@@ -502,42 +524,35 @@ function buildOrderEmailLayout(data = {}, opts = {}) {
     addressLines = addressLines.slice(1);
   }
 
-  // ✅ Build "select on map" query from ADDRESS ONLY (avoid business/company/name)
   let mapLines = [...addressLines];
 
-  // remove first 1–2 lines if they don't contain digits (often company/business)
   if (mapLines.length && !hasDigit(mapLines[0])) mapLines = mapLines.slice(1);
   if (mapLines.length && !hasDigit(mapLines[0])) mapLines = mapLines.slice(1);
 
-  // keep "Australia" only if there is more than one line
   if (mapLines.length > 1) {
     mapLines = mapLines.filter((l) => norm(l) !== "australia");
   }
 
   const mapsQuery = mapLines.join(", ").trim();
-
-  // ✅ reliable maps URL in emails
   const mapsUrl = mapsQuery ? `https://www.google.com/maps?q=${encodeURIComponent(mapsQuery)}` : "";
 
   const leadText =
     clean(opts.leadText) || "Review your wholesale order summary below.";
 
-  /* TOP BOX */
   const topLeft = `
     ${topLeadTitle("Wholesaler Order")}
     ${p12(leadText, B.TEXT)}
     ${spacer(10)}
     ${h16("Customer No.")}
     ${p12(custNo, B.TEXT)}
-    ${
-      extraNotes
-        ? `
-          ${spacer(14)}
-          ${h16("Extra notes")}
-          ${p12(extraNotes, B.SUBTLE)}
-        `
-        : ""
-    }
+
+    ${spacer(14)}
+    ${h16("Order method")}
+    ${p12(orderMethod, B.TEXT)}
+
+    ${spacer(14)}
+    ${h16("Extra notes")}
+    ${p12(extraNotes, B.SUBTLE)}
   `;
 
   const topRight = `
@@ -548,7 +563,6 @@ function buildOrderEmailLayout(data = {}, opts = {}) {
 
   const topBox = box(twoCol({ leftHTML: topLeft, rightHTML: topRight }));
 
-  /* ✅ Combined Contact + Default address (one block, 2 columns) */
   const contactInner = `
     ${h16("Contact information")}
     ${p12(customerName, B.TEXT)}
@@ -606,7 +620,6 @@ function buildOrderEmailLayout(data = {}, opts = {}) {
     </table>
   `);
 
-  /* Items block */
   const itemsBox = box(`
     ${h16("Items")}
     ${spacer(10)}
