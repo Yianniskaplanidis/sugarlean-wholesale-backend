@@ -10,14 +10,16 @@
 // ✅ Product title clamped tidy, keep STATUS pill
 // ✅ "select on map" links to ADDRESS ONLY (not business/name) + reliable maps URL
 // ✅ Move “Thanks for your order...” into top-left lead line (replaces review text) for USER email
-// ✅ User subject: "Your order has been received — <orderId>"
 // ✅ Include Extra notes in email
 // ✅ If no notes, show "None"
 // ✅ Show only the selected order method in one clean block
 // ✅ Question + selected option + notes all together
 // ✅ Order method / notes shown in a NEW grey framed block below Contact information
 // ✅ Extra notes now shown inside a white framed box
-// ✅ Footer support email: orders@sugarlean.com.au
+// ✅ Admin subject: #(Customer Number) Wholesale Order Submission - (Order ID)
+// ✅ Customer subject: #(Customer Number) Wholesale Order Received - (Order ID)
+// ✅ Admin email hides “Need help? Email...” footer
+// ✅ Customer email keeps footer support email
 
 const { BRAND, SITE_URL, LOGO_URL } = require("./templates");
 
@@ -528,7 +530,7 @@ function orderItemsTableScreenshot(items = []) {
 }
 
 /* ---------- main email wrapper ---------- */
-const base = ({ bodyHTML = "" }) => `
+const base = ({ bodyHTML = "", showFooter = true, showSupportFooter = true }) => `
 <!doctype html>
 <html>
   <head>
@@ -583,6 +585,9 @@ const base = ({ bodyHTML = "" }) => `
               </td>
             </tr>
 
+            ${
+              showFooter
+                ? `
             <!-- Footer -->
             <tr>
               <td style="
@@ -591,11 +596,17 @@ const base = ({ bodyHTML = "" }) => `
                 padding:14px 16px 20px 16px;
                 text-align:center;
               ">
+                ${
+                  showSupportFooter
+                    ? `
                 <div style="font-family:${B.FONT}; font-size:12px; line-height:1.6; color:${B.SUBTLE}; font-weight:400;">
                   Need help? Email
                   <a href="mailto:${SUPPORT_EMAIL}" style="color:${B.TEXT};text-decoration:none;font-weight:400;">${SUPPORT_EMAIL}</a>
                 </div>
-                <div style="margin-top:6px;font-family:${B.FONT}; font-size:12px; line-height:1.6; color:${B.SUBTLE}; font-weight:400;">
+                `
+                    : ""
+                }
+                <div style="margin-top:${showSupportFooter ? "6px" : "0"};font-family:${B.FONT}; font-size:12px; line-height:1.6; color:${B.SUBTLE}; font-weight:400;">
                   Sent automatically from
                   <a href="${SITE_URL}" style="color:${B.YELLOW};text-decoration:none;font-weight:700;">www.sugarlean.com.au</a>
                 </div>
@@ -604,6 +615,9 @@ const base = ({ bodyHTML = "" }) => `
                 </div>
               </td>
             </tr>
+            `
+                : ""
+            }
 
           </table>
 
@@ -750,7 +764,7 @@ function buildOrderEmailLayout(data = {}, opts = {}) {
   const contactAddressBox = box(`
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
       <tr>
-        <td valign="top" style="width:50%; padding-right:14px;">
+        <td valign="top" style="width:50%; padding-right:14px;" class="col">
           ${contactInner}
         </td>
 
@@ -758,7 +772,7 @@ function buildOrderEmailLayout(data = {}, opts = {}) {
           &nbsp;
         </td>
 
-        <td valign="top" style="width:50%; padding-left:14px;">
+        <td valign="top" style="width:50%; padding-left:14px;" class="col">
           ${addressInner}
         </td>
       </tr>
@@ -798,7 +812,7 @@ function confirmOrderAdminTemplate(data = {}) {
   const bodyHTML = buildOrderEmailLayout(data, {
     leadText: "Review your wholesale order summary below.",
   });
-  return base({ bodyHTML });
+  return base({ bodyHTML, showFooter: true, showSupportFooter: false });
 }
 
 function confirmOrderUserTemplate(data = {}) {
@@ -806,7 +820,7 @@ function confirmOrderUserTemplate(data = {}) {
     leadText:
       "Thanks for your order! We’re now reviewing stock, packing, and shipping and will be in touch shortly.",
   });
-  return base({ bodyHTML });
+  return base({ bodyHTML, showFooter: true, showSupportFooter: true });
 }
 
 /* ---------- exports expected by mailer.js ---------- */
