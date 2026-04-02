@@ -784,7 +784,7 @@ function buildOrderEmailLayout(data = {}, opts = {}) {
       ${renderOrderMethodSection(selectedOrderMethodKey, orderMethodLabel, extraNotes)}
     `,
     `
-      background:#F1F1F1;
+      background:#FFFFFF;
     `
   );
 
