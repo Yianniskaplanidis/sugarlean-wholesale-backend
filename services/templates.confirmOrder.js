@@ -16,6 +16,7 @@
 // ✅ Show only the selected order method in one clean block
 // ✅ Question + selected option + notes all together
 // ✅ Order method / notes shown in a NEW grey framed block below Contact information
+// ✅ Extra notes now shown inside a white framed box
 // ✅ Footer support email: orders@sugarlean.com.au
 
 const { BRAND, SITE_URL, LOGO_URL } = require("./templates");
@@ -337,6 +338,9 @@ function renderOrderMethodSection(selectedKey = "", orderMethodLabel = "None", e
     selectedSubtitle = "";
   }
 
+  const notesText = extraNotes || "None";
+  const notesColor = notesText === "None" ? B.SUBTLE : B.TEXT;
+
   return `
     ${h16("How would you like to place your order? *", 12)}
     ${renderSelectedOrderMethodCard({
@@ -346,7 +350,26 @@ function renderOrderMethodSection(selectedKey = "", orderMethodLabel = "None", e
     })}
     ${spacer(16)}
     ${h16("Extra notes", 8)}
-    ${p12(extraNotes || "None", B.SUBTLE)}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="
+      border:1px solid ${B.LINE};
+      border-radius:12px;
+      border-collapse:separate;
+      background:#FFFFFF;
+      margin:0;
+    ">
+      <tr>
+        <td style="
+          padding:12px 14px;
+          font-family:${B.FONT};
+          font-size:12px;
+          font-weight:400;
+          line-height:1.6;
+          color:${notesColor};
+        ">
+          ${esc(notesText)}
+        </td>
+      </tr>
+    </table>
   `;
 }
 
@@ -791,18 +814,20 @@ function renderConfirmOrderAdminEmail(data = {}) {
   const c = data.customer || {};
   const orderId = data.orderId || "No Order ID";
   const custNo = c.customerNumber || "No Customer #";
-  const who = c.name || c.email || "Unknown";
 
   return {
-    subject: `Wholesale Order Submission — ${orderId} — ${custNo} — ${who}`,
+    subject: `#${custNo} Wholesale Order Submission - ${orderId}`,
     html: confirmOrderAdminTemplate(data),
   };
 }
 
 function renderConfirmOrderUserEmail(data = {}) {
+  const c = data.customer || {};
   const orderId = data.orderId || "No Order ID";
+  const custNo = c.customerNumber || "No Customer #";
+
   return {
-    subject: `Your order has been received — ${orderId}`,
+    subject: `#${custNo} Wholesale Order Received - ${orderId}`,
     html: confirmOrderUserTemplate(data),
   };
 }
