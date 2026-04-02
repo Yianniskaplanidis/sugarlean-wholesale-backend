@@ -841,7 +841,7 @@ function renderConfirmOrderUserEmail(data = {}) {
   const custNo = c.customerNumber || "No Customer #";
 
   return {
-    subject: `#${custNo} Wholesale Order Received - ${orderId}`,
+    subject: `Your Order has been received - ${orderId}`,
     html: confirmOrderUserTemplate(data),
   };
 }
