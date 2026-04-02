@@ -54,7 +54,6 @@ function sanitizeAddress(addr) {
 function pickItemImageUrl(it) {
   if (!it || typeof it !== "object") return "";
 
-  // direct keys
   let url =
     t(it.image) ||
     t(it.imageUrl) ||
@@ -69,7 +68,6 @@ function pickItemImageUrl(it) {
     t(it.product_image) ||
     "";
 
-  // nested objects
   if (!url && it.image && typeof it.image === "object") {
     url = t(it.image.src) || t(it.image.url) || "";
   }
@@ -77,13 +75,11 @@ function pickItemImageUrl(it) {
     url = t(it.featured_image.src) || t(it.featured_image.url) || "";
   }
 
-  // arrays
   if (!url && Array.isArray(it.images) && it.images.length) {
     const first = it.images[0];
     url = typeof first === "string" ? t(first) : t(first?.src) || t(first?.url) || "";
   }
 
-  // product nested
   if (!url && it.product && typeof it.product === "object") {
     url =
       t(it.product.featured_image) ||
@@ -100,7 +96,6 @@ function pickItemImageUrl(it) {
     }
   }
 
-  // Keep it reasonable length for logs/email payload
   return clampStr(url, 1200);
 }
 
@@ -157,10 +152,7 @@ function buildConfirmOrderPayload(reqBody, req) {
         t(it.name) ||
         "",
 
-      // ✅ keep brand/vendor if your frontend sends it (shows above title in your email)
       vendor: clampStr(it.vendor || it.brand || it.company || it.collection || "", 120),
-
-      // ✅ keep image URL so email template can render thumbnails
       imageUrl,
 
       sku: t(it.sku) || t(it.SKU) || t(it.variant_sku) || t(it.variantSku) || "",
@@ -238,7 +230,22 @@ function buildConfirmOrderPayload(reqBody, req) {
 
   return {
     shop: clampStr(b.shop || b.shopDomain || b.domain, 120),
-    orderId: clampStr(b.orderId || b.order_id || b.orderNumber || b.order_number, 80),
+
+    orderId: clampStr(
+      b.orderId || b.order_id || b.orderNumber || b.order_number,
+      80
+    ),
+
+    // ✅ FIXED: include order method values for email template
+    orderMethod: clampStr(
+      b.orderMethod || b.order_method || "",
+      80
+    ),
+
+    orderMethodLabel: clampStr(
+      b.orderMethodLabel || b.order_method_label || "",
+      200
+    ),
 
     note: clampStr(b.note || b.message || b.notes, 4000),
 
@@ -333,7 +340,8 @@ router.post("/confirm-order", async (req, res) => {
         items: data.items?.length || 0,
         hasShipping: !!data.shippingAddress,
         hasExtraNotes: !!t(data.extraNotes),
-        // ✅ quick visibility: how many images came through
+        hasOrderMethod: !!t(data.orderMethod),
+        hasOrderMethodLabel: !!t(data.orderMethodLabel),
         images: (data.items || []).filter((x) => t(x.imageUrl)).length,
       });
     } catch (err) {
@@ -357,7 +365,8 @@ router.post("/confirm-order-sync", async (req, res) => {
       ok: true,
       orderId: data.orderId || null,
       sent: { admin: !!info?.admin, user: !!info?.user },
-      // ✅ helps you confirm thumbnails are present in payload
+      hasOrderMethod: !!t(data.orderMethod),
+      hasOrderMethodLabel: !!t(data.orderMethodLabel),
       images: (data.items || []).filter((x) => t(x.imageUrl)).length,
     });
   } catch (e) {
